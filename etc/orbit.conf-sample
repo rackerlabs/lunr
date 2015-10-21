@@ -1,0 +1,82 @@
+[db]
+#url = sqlite:////etc/lunr/lunr.db
+# url = mysql://user:pass@localhost/lunr
+# poolclass = QueuePool
+# echo = False
+# echo_pool = False
+# pool_size = 5
+# pool_recycle = 28800
+
+[orbit]
+#user = lunr
+#timeout=120 # Not configurable per suspect.
+
+# NOTE: Time formats are days=0, seconds=0, microseconds=0,
+# minutes=0, hours=0, weeks=0 and can be separated by commas
+# 'hours=1, minutes=30' is a span of 1 hour and 30 minutes
+
+[suspects]
+# How often the 'suspects' jobs will be run
+interval = seconds=10
+# The time span used to find suspects, in the example
+# below; suspects that are still in status 'SAVING' or
+# 'BUILDING' for 1 hour are suspect and will be restarted
+span = hours=1
+
+[restore-suspects]
+# uncomment to overide defaults in section [suspects]
+#interval = seconds=10
+#span = hours=1
+
+[backup-suspects]
+# uncomment to overide defaults in section [suspects]
+#interval = seconds=10
+#span = hours=1
+
+[prune-suspects]
+# uncomment to overide defaults in section [suspects]
+#interval = seconds=10
+#span = hours=1
+
+[audit-suspects]
+# uncomment to overide defaults in section [suspects]
+#interval = seconds=10
+#span = hours=1
+
+[detach]
+# How often the 'detach' jobs will be run
+interval = seconds=5
+# The time span a volume can be stuck in 'DETACHING' before 
+# we check the export and attempt to fix
+span = seconds=5
+
+[cinder]
+# Cinder Client Config
+username = brix
+password = sekritMotar
+auth_url = http://localhost:5000
+cinder_url = http://localhost:8776
+rax_auth=True
+
+# logging config
+[formatters]
+keys = normal
+
+[handlers]
+keys = syslog
+
+[loggers]
+keys = root
+
+[formatter_normal]
+class = lunr.common.logger.LunrFormatter
+format = %(asctime)s %(name)s:%(levelname)-8s %(message)s
+
+[handler_syslog]
+class = handlers.SysLogHandler
+args = ['/dev/log', handlers.SysLogHandler.LOG_USER]
+formatter = normal
+
+[logger_root]
+level = DEBUG
+handlers = syslog

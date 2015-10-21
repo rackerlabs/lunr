@@ -1,0 +1,23 @@
+# This file defines the cmds needed to run the lunr-storage server.
+#
+# To prevent issues which may break sudo access on your system, it's recommened
+# to add these commands using 'visudo -f /etc/sudoers.d/lunr_sudoers'.
+#
+# See the sudoers man page for more details.
+#
+
+Cmnd_Alias LUNRCMDS = /sbin/vgs,        \
+                      /sbin/lvs,        \
+                      /sbin/lvcreate,   \
+                      /sbin/lvremove,   \
+                      /sbin/lvchange,   \
+                      /sbin/lvrename,   \
+                      /sbin/dmsetup,    \
+                      /sbin/iscsiadm,   \
+                      /bin/dd,          \
+                      /usr/sbin/ietadm, \
+                      /usr/bin/qemu-img,\
+                      /bin/mount,       \
+                      /bin/umount
+
+lunr ALL = (root) NOPASSWD: LUNRCMDS

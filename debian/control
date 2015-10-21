@@ -1,0 +1,76 @@
+Source: lunr
+Section: net
+Priority: optional
+Maintainer: Jay Payne <letterj@racklabs.com>
+Build-Depends: debhelper (>= 7.0.50~),
+ python-all,
+ python-support (>= 0.90),
+ python-setuptools
+Standards-Version: 3.9.3
+XS-Python-Version: >= 2.6
+Homepage: https://lunr.racklabs.com
+
+Package: python-lunr
+Architecture: all
+Depends: ${misc:Depends}, ${python:Depends},
+ python-pkg-resources,
+ python-setproctitle,
+ python-prettytable
+Description: Python source code for the Rackspace Lunr Project
+ This is the Python code to implement a Cloud Block Storage System 
+ .
+Homepage: https://lunr.racklabs.com/
+
+Package: lunr-api
+Architecture: all
+Depends: python-lunr (=${binary:Version}), ${python:Depends}, ${shlibs:Depends}, ${misc:Depends},
+ python-paste,
+ python-pastedeploy,
+ python-webob,
+ python-routes (>= 1.12.3),
+ python-sqlalchemy,
+ python-cinder,
+ python-cinderclient,
+ python-migrate
+Provides: ${python:Provides}
+Description: The lunr api server.
+ The Lunr API server will accept requests from the nova "lunr" driver and 
+ send them to the Lunr Storage server.  The public interface can be used
+ to create, delete and backup storage volumes.  There is also an admin interface
+ for managing lunr storage nodes.
+ .
+Homepage: https://lunr.racklabs.com/
+
+Package: lunr-storage
+Architecture: all
+Depends: python-lunr (=${binary:Version}), ${python:Depends}, ${shlibs:Depends}, ${misc:Depends},
+ lvm2,
+ iscsitarget,
+ cgroup-bin,
+ python-netaddr,
+ python-paste,
+ python-simplejson,
+ python-pastedeploy,
+ python-webob,
+ python-routes (>= 1.12.3),
+ open-iscsi, 
+ python-lz4,
+ python-glanceclient,
+ qemu-utils,
+ blktap-utils
+Provides: ${python:Provides}
+Description: The lunr storage server.
+ The Lunr Storage server will contain volumes that can be connected to nova 
+ instances over an isci interface.  These servers will use Swift to backup volumes.
+ .
+Homepage: https://lunr.racklabs.com/
+
+Package: lunr-orbit
+Architecture: all
+Depends: python-lunr (=${binary:Version}), ${python:Depends}, ${shlibs:Depends}, ${misc:Depends}
+Provides: ${python:Provides}
+Description: The lunr Maintenance Daemon.
+ The Lunr Maintenance Daemon will monitor the lunr database and restart stopped or stalled
+ backups.
+ .
+Homepage: https://lunr.racklabs.com/

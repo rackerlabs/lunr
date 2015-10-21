@@ -1,0 +1,7 @@
+Format-Specification: http://svn.debian.org/wsvn/dep/web/deps/dep5.mdwn?op=file&rev=135
+Name: lunr
+Source: https://lunr.racklabs.com/
+Files: *
+Copyright: 2012 Rackspace
+License: Private
+ Private

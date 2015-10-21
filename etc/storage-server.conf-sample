@@ -1,0 +1,122 @@
+[DEFAULT]
+#lunr_dir = /etc/lunr
+
+# Paster Serve Configuration
+[pipeline:main]
+pipeline = error-catcher trans-logger storage-server
+
+[app:storage-server]
+use = egg:lunr#storage_server
+
+[filter:error-catcher]
+use = egg:lunr#error_catcher
+
+[filter:trans-logger]
+use = egg:lunr#trans_logger
+# echo = False
+# level = DEBUG
+# name =
+
+[server:main]
+use = egg:Paste#http
+host = 0.0.0.0
+port = 8081
+
+# Storage Server Configuration
+[storage]
+# api_server = http://localhost:8080
+# api_retry = 1
+# name defaults to hostname
+# name = 
+# host = localhost
+# port = 3260
+# volume_type = vtype
+# run_dir = /etc/lunr/run
+# Do not set this option to true
+# skip_fork = false
+# defaults to host
+# cinder_host = 
+# Update cinder and stats file every N blocks
+# stats_update_interval = 1000
+
+[cinder]
+#username=demo
+#password=demo
+#auth_url=http://localhost:5000
+#cinder_url=http://localhost:8776
+#rax_auth=True
+
+[glance]
+#username=demo
+#password=demo
+#auth_url=http://localhost:5000
+#glance_urls=http://localhost:9292
+#glance_mgmt_urls=http://localhost:9292
+#insecure=False
+#version=1
+#timeout=60
+#auth_strategy=noauth
+#convert_gbs=100
+#base_convert_multiplier=2.0
+#custom_convert_multiplier=4.0
+
+[cgroup]
+# cgroup_path = /sys/fs/cgroup/blkio/sysdefault
+
+[volume]
+#volume_group = lunr-volume
+#device_prefix = /dev
+#max_snapshot_bytes = None
+
+[export]
+#ietd_config = /etc/iet/ietd.conf
+#iqn_prefix = iqn.2010-11.com.rackspace
+#device_prefix = /dev
+#proc_iet_volume = /proc/net/iet/volume
+#proc_iet_session = /proc/net/iet/session
+#initiators_allow = /etc/iet/initiators.allow
+#default_allows = ALL
+
+[backup]
+# Available options are (disk, swift, memory)
+#client = disk
+
+[disk]
+#path = /etc/lunr/backups
+
+[swift]
+#auth_url = http://localhost:5000/v2.0/tokens
+#user  = user
+#key = test
+#region = DFW
+#snet = False
+#retries = 5
+
+[scrub]
+# Enforce a max throughput on volume scrubs (Not COW scrubs)
+# Throttle speed is in Megabytes per second (MB/s)
+#throttle_speed = 200.0
+
+# Logging config
+[formatters]
+keys = normal
+
+[handlers]
+keys = syslog
+
+[loggers]
+keys = root
+
+[formatter_normal]
+class = lunr.common.logger.LunrFormatter
+format = %(asctime)s %(name)s:%(levelname)-8s %(message)s
+
+[handler_syslog]
+class = handlers.SysLogHandler
+args = ['/dev/log', handlers.SysLogHandler.LOG_USER]
+formatter = normal
+
+[logger_root]
+level = INFO
+handlers = syslog
+

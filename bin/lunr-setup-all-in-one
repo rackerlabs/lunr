@@ -1,0 +1,136 @@
+#!/bin/bash
+# Copyright (c) 2011-2015 Rackspace US, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+#set -x
+
+WORKING_DIR=$(cd $(dirname "$0") && pwd)
+
+# Install required packages
+sudo apt-get install lvm2 iscsitarget open-iscsi python-pip\
+    cgroup-bin screen curl qemu-utils blktap-utils --yes --force-yes
+
+DISTRO=$(lsb_release -c -s)
+if [[ ${DISTRO} =~ (oneiric|precise) ]]; then
+    sudo apt-get install iscsitarget-dkms --yes --force-yes
+fi
+
+# If precise install requirements via pip
+if [[ ${DISTRO} =~ (precise|trusty) ]]; then
+    # Install required pip packages
+    for package in `cat $WORKING_DIR/../requirements.txt`;
+        do pip install $package;
+    done
+fi
+
+# If oneiric or lucid, install requirements via ubuntu repo
+if [[ ${DISTRO} =~ (oneiric|lucid) ]]; then
+    sudo apt-get install python-setuptools python-pastescript \
+    python-sqlalchemy python-webob python-coverage python-nose \
+    python-simplejson python-prettytable python-setproctitle \
+    python-migrate python-routes --yes --force-yes
+fi
+
+# Lucid has an old version of routes, install a later version
+if [[ ${DISTRO} =~ (lucid) ]]; then
+    sudo pip install "routes>=1.12"
+fi
+
+ISCSI="/etc/default/iscsitarget"
+if [ ! -f $ISCSI ]; then
+    echo "$ISCSI missing; iscsitarget package is not installed?"
+    exit 1
+fi
+sudo sed -i "s/false/true/" $ISCSI
+sudo service iscsitarget start
+
+# set working directory to lunr src root
+cd $WORKING_DIR/..
+
+# Package lunr project
+sudo python setup.py develop
+
+# Create and own /etc/lunr
+sudo mkdir /etc/lunr
+sudo chown -R $USER:$USER /etc/lunr/
+
+# Copy samples configs to /etc/lunr
+for c in etc/*.conf-sample ; do
+    cp $c /etc/lunr
+done
+rename "s/-sample//" /etc/lunr/*-sample
+
+# cgroups config
+sed -i "s/lunr/$USER/" /etc/lunr/cgconfig.conf
+sudo mv /etc/lunr/cgconfig.conf /etc/cgconfig.conf
+sudo service cgconfig restart
+
+# Copy sample screenrc
+cp etc/lunr.screenrc-sample /etc/lunr/lunr.screenrc
+
+# Is this not needed unless running processes as root?
+export LUNR_CONFIG=/etc/lunr/lunr.conf
+# Set our current user to the lunr user
+sed -i "s/^#\s*user\s*=\s*lunr/user = $USER/" $LUNR_CONFIG
+
+# link some of the dev stuff into /usr/bin
+for file in jcurl lunr-reset lunr-screen; do
+    sudo ln -s $(pwd)/bin/${file} /usr/bin/${file}
+done
+
+# Setup device for storage server
+sudo ./bin/lunr-setup-storage --user=$USER
+
+if [ $? -ne 0 ]; then
+    echo "-- lunr-setup-storage failed, re-run with"
+    echo "-- 'sudo $(pwd)/bin/lunr-setup-storage --user=$USER' when ready"
+    exit 1
+fi
+
+# setup db
+lunr-manage version_control
+lunr-manage upgrade
+
+# add vtype
+echo 'adding default volume type (vtype)'
+./bin/lunr-screen -dm > /dev/null
+for i in {1..10}; do
+    curl http://localhost:8081/status &> /dev/null
+    if [ $? -eq 0 ]; then
+        break
+    fi
+    sleep 1
+done
+lunr-admin types create vtype
+screen -S lunr -X quit
+
+# deploy node
+echo 'deploying storage node'
+./bin/lunr-screen -dm > /dev/null
+for i in {1..10}; do
+    curl http://localhost:8081/status &> /dev/null
+    if [ $? -eq 0 ]; then
+        break
+    fi
+    sleep 1
+done
+lunr-admin nodes deploy -a
+screen -S lunr -X quit
+
+echo "== Setup is complete =="
+echo "You can start lunr services under a screen session "
+echo "by typing 'lunr-screen'"
+
+exit 0

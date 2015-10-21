@@ -1,0 +1,268 @@
+#!/usr/bin/env python
+# Copyright (c) 2011-2015 Rackspace US, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from tempfile import NamedTemporaryFile
+import grp, os, pwd, sys, subprocess, re
+from collections import namedtuple
+from stat import S_IRUSR, S_IRGRP
+from optparse import OptionParser
+from shutil import move
+from os.path import abspath, join, dirname, exists, basename
+
+from lunr.storage.helper.export import ExportHelper
+from lunr.common.config import LunrConfig
+
+import lunr
+
+
+def get_devices():
+    devices = {}
+    stdout, stderr = subprocess.Popen(['fdisk', '-l'], stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE).communicate()
+
+    # fdisk spits out partitioned devices to stdout
+    for line in stdout.splitlines():
+        if 'Disk /' in line:
+            # Split 'Disk /dev/sda: 80.0 GB, 80000000000 bytes'
+            values = line.split()
+            # devices = { '/dev/sda': { 'size': '80.0 GB' ....  } }
+            devices[values[1].strip(':')] = { 'size': " ".join(values[2:3]),
+                                            'bytes': values[4],
+                                            'partitioned': True,
+                                            'lvm' : False }
+
+    # fdisk spits out un-partitioned devices to stderr
+    for line in stderr.splitlines():
+        # Split 'Disk /dev/sdb doesn't contain a valid partition table'
+        devices[line.split(None, 2)[1]]['partitioned'] = False
+
+    stdout, stderr = subprocess.Popen(['pvs', '--noheadings', '--options=pv_name'],
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
+
+    # 'pvs' will display all physical volumes that are registered with LVM
+    for line in stdout.splitlines():
+        try:
+            devices[line.strip()]['lvm'] = True
+        except KeyError:
+            pass
+
+    return devices
+
+
+def get_pvname():
+
+    # Get a list of devices on the system
+    devices = get_devices()
+
+    suggested_default = None
+    print "Please select device to use for physical volume:"
+    for disk, info in sorted(devices.items()):
+        if not info['lvm'] and not info['partitioned']:
+            suggested_default = disk
+
+        print '%s - %16s (Partitoned: %s, Physical Volume: %s)' % \
+            (disk, info['size'], info['partitioned'], info['lvm'])
+
+    if not suggested_default:
+        volumes = [ key for key, value in devices.items() if value['lvm'] ]
+        if volumes:
+            print "\n-- The volumes (%s) are already in use by LVM" % ",".join(volumes)
+            print "-- use 'pvremove' on one of these, if you want to use the device"
+
+        print "\n-- If there is a device you want use, but it already has a partition table"
+        print "-- use 'sudo dd if=/dev/zero of=/dev/<DEVICE> bs=1k count=1' to clear the parition table"
+        raise Exception('No usable devices found')
+
+    try:
+        pvname = raw_input('Enter device name [%s]: ' % suggested_default)
+    except (KeyboardInterrupt, EOFError):
+        raise Exception('user quit')
+    if not pvname:
+        pvname = suggested_default
+
+    return pvname
+
+
+def yes_no(msg, default=None):
+    while True:
+        result = raw_input(msg)
+        if default:
+            if result == "":
+                return default
+        if re.match("^(Y|y)$", result):
+            return True
+        if re.match("^(N|n)$", result):
+            return False
+
+def parse_sudoers(file, user):
+    variable_name = ''
+    # add lunr_sudoers to /etc/sudoers.d/
+    lunr_sudoers = []
+    with open(file) as f:
+        for line in f:
+            if not line:
+                continue
+            lunr_sudoers.append(line)
+        # mangle last line
+        lunr_sudoers[-1] = lunr_sudoers[-1].replace('lunr', user, 1)
+        # Get the name of the variable at the
+        # end of this line (ie: LUNRCMDS)
+        variable_name = lunr_sudoers[-1].split()[-1]
+
+    with NamedTemporaryFile(delete=False) as f:
+        f.writelines(lunr_sudoers)
+        tmp_path = f.name
+
+    os.chmod(tmp_path, S_IRUSR | S_IRGRP)  # 0440
+    # Remove the -sample from 'lunr_sudoers-sample', then give it a new path
+    move(tmp_path, join('/etc/sudoers.d', basename(file.split('-')[0])))
+    return variable_name
+
+
+def main():
+    export = ExportHelper(LunrConfig.from_storage_conf())
+    parser = OptionParser('%prog [OPTIONS] [PVNAME]')
+    parser.add_option('--volume-group', default=export.volume_group,
+                      help='set lvm volume group name')
+    parser.add_option('--ietd-config', default=export.ietd_config,
+                      help='set path to ietd.conf')
+    parser.add_option('--user',
+                      help='set the user (and group) that will run the storage server')
+    parser.add_option('--group', default=None,
+                      help='over-ride group to be different that user')
+    parser.add_option('--no-lvm', dest='lvm', default=True,
+                      action='store_false', help='skip lvm commands')
+    parser.add_option('--lvm-only', dest='lvm_only', action='store_true',
+                      help='only do lvm setup')
+    options, args = parser.parse_args()
+
+    if os.getuid():
+        parser.print_help()
+        print
+        return 'ERROR: %s must be run as root or with sudo.' % sys.argv[0]
+
+    if not options.user:
+        return 'ERROR: must provide --user option'
+
+    if not options.group:
+        options.group = options.user
+
+    if not options.lvm_only:
+        try:
+            pwd.getpwnam(options.user)
+        except KeyError:
+            return 'ERROR: invalid user %s' % options.user
+
+        try:
+            grp.getgrnam(options.group)
+        except KeyError:
+            return 'ERROR: invalid group %s' % options.group
+
+    # TODO:(thrawn01) figure out which isci backend we are
+    # using and run setup for that backend
+
+    commands = """
+usermod -a -G disk %(user)s
+touch %(ietd_config)s
+chgrp %(group)s %(ietd_config)s
+chmod g+w %(ietd_config)s
+""".strip().splitlines()
+
+    lvm_commands = """
+pvcreate %(pvname)s --metadatasize=1024k
+vgcreate %(volume_group)s %(pvname)s
+""".strip().splitlines()
+
+    subs = dict(vars(options))
+
+    if options.lvm or options.lvm_only:
+        # check for existing volume group
+        with open(os.devnull, 'w') as f:
+            returncode = subprocess.call(('vgs', options.volume_group),
+                                         stdout=f, stderr=f)
+        if returncode:
+            # try to find a pv
+            if not args:
+                try:
+                    pvname = get_pvname()
+                except Exception, e:
+                    return '\nERROR: %s' % e
+            else:
+                pvname = args[0]
+
+            # add lvm setup commands
+            if options.lvm_only:
+                commands = lvm_commands
+            else:
+                commands.extend(lvm_commands)
+            subs['pvname'] = pvname
+        else:
+            print 'A volume group named %s already exists.' % \
+                    options.volume_group
+
+    # put it back together, sub in options and break it back apart
+    commands = (os.linesep.join(commands) % subs).strip().splitlines()
+
+    for cmd in commands:
+        p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+        out, err = p.communicate()
+        print 'COMMAND: %s' % cmd
+        if p.returncode:
+            if out:
+                print 'STDOUT: %s' % out
+            if err:
+                print 'STDERR: %s' % err
+            return 'ERROR: command failed with errcode %s' % p.returncode
+
+    if options.lvm_only:
+        return
+
+    # Setup the sudoers files
+    sample = abspath(join(dirname(__file__), '../etc/lunr_sudoers-sample'))
+    var_names = [parse_sudoers(sample, options.user)]
+    if yes_no("Install sudoers file for unit-tests (Y/N)? [Y]:", 'Y'):
+        sample = abspath(join(dirname(__file__),
+                '../etc/lunr_sudoers_tests-sample'))
+        var_names.append(parse_sudoers(sample, options.user))
+
+    # if user is member of admin/sudo, append LUNRCMDS explictly to end of file
+    privledged_users = set()
+    for group_name in ('admin', 'sudo'):
+        try:
+            privledged_users.update(grp.getgrnam(group_name).gr_mem)
+        except KeyError:
+            # precise does not have an admin group by default
+            pass
+
+    if options.user in privledged_users:
+        comment = '# needed to override admin directive\n'
+        directive = '%s ALL = (root) NOPASSWD: %s\n' \
+                % (options.user, ', '.join(var_names))
+        with open('/etc/sudoers') as fr:
+            for line in fr:
+                if line == directive:
+                    break
+            else:
+                with open('/etc/sudoers', 'a') as fa:
+                    fa.writelines(['\n', comment, directive])
+
+    print 'DONE.'
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

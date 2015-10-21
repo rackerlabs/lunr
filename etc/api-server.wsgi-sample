@@ -1,0 +1,23 @@
+"""
+This is an example of how the Lunr API server might be configured to run
+in mod_wsgi on Apache or similar servers.  If this file is placed at
+/srv/api-server.wsgi, then:
+
+  <VirtualHost *:80>
+  WSGIScriptAlias / "/srv/api-server.wsgi"
+  </VirtualHost>
+"""
+
+import logging.config
+
+from paste.deploy import loadapp
+
+
+conf_file = '/etc/lunr/api-server.conf'
+
+# configure logging
+logging.config.fileConfig(conf_file, disable_existing_loggers=True)
+
+# create wsgi entry point
+application = loadapp('config:%s' % conf_file)
+

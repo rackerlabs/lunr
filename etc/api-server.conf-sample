@@ -1,0 +1,77 @@
+[DEFAULT]
+#lunr_dir = /etc/lunr
+
+# Paster Serve Configuration
+[pipeline:main]
+pipeline = healthcheck error-catcher trans-logger statlogger api-server
+
+[app:api-server]
+use = egg:lunr#api_server
+
+[filter:statlogger]
+use = egg:lunr#statlogger
+next = api-server
+
+[filter:healthcheck]
+use = egg:lunr#healthcheck
+
+[filter:error-catcher]
+use = egg:lunr#error_catcher
+
+[filter:trans-logger]
+use = egg:lunr#trans_logger
+# echo = False
+# level = DEBUG
+# name =
+
+[server:main]
+use = egg:Paste#http
+host = 0.0.0.0
+port = 8080
+#threadpool_kill_thread_limit = 1800
+#threadpool_workers = 10
+
+# API Server Configuration
+[db]
+# url = sqlite:////etc/lunr/lunr.db
+# url = mysql://user:pass@localhost/lunrdb
+# url = postgresql://user:pass@localhost/lunrdb
+# poolclass = QueuePool
+# echo = False
+# echo_pool = False
+# pool_size = 5
+# pool_recycle = 28800
+# auto_create = False
+
+[placement]
+fill_percentage_limit = 0.5
+# This defaults to broad_fill. deep_fill is the only other valid option.
+#fill_strategy = broad_fill
+#image_convert_limit = 1
+
+[storage]
+# node_timeout = 120
+
+# logging config
+[formatters]
+keys = normal
+
+[handlers]
+keys = syslog
+
+[loggers]
+keys = root
+
+[formatter_normal]
+class = lunr.common.logger.LunrFormatter
+format = %(asctime)s %(name)s:%(levelname)-8s %(message)s
+
+[handler_syslog]
+class = handlers.SysLogHandler
+args = ['/dev/log', handlers.SysLogHandler.LOG_USER]
+formatter = normal
+
+[logger_root]
+level = DEBUG
+handlers = syslog
+

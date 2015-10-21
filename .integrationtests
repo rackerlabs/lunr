@@ -1,0 +1,3 @@
+#!/bin/bash
+
+nosetests --exe $(dirname $0)/testlunr/integration $@

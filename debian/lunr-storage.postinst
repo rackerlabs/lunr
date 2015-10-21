@@ -1,0 +1,28 @@
+#!/bin/sh -e
+
+#DEBHELPER#
+
+if ! getent passwd lunr > /dev/null ; then
+  adduser --system --quiet --disabled-password --group lunr
+fi
+
+usermod -a -G disk lunr
+
+mkdir -p /var/lunr
+chown lunr:lunr /var/lunr
+mkdir -p /etc/lunr
+chown lunr:lunr /etc/lunr
+mkdir -p /var/log/lunr
+chown lunr:lunr /var/log/lunr
+
+if [ -e "/usr/share/doc/lunr-storage/lunr_sudoers-sample" ] ; then
+    mv /usr/share/doc/lunr-storage/lunr_sudoers-sample /etc/sudoers.d/lunr_sudoers
+    chmod 0440 /etc/sudoers.d/lunr_sudoers
+fi
+
+if [ -e "/usr/share/doc/lunr-storage/cgconfig.conf-sample" ] ; then
+    mv /usr/share/doc/lunr-storage/cgconfig.conf-sample /etc/cgconfig.conf
+fi
+
+# Create bash completion scripts for the admin tools
+lunr-storage-admin --bash-completion-script > /etc/bash_completion.d/lunr-storage-admin

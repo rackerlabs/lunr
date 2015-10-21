@@ -1,0 +1,20 @@
+mount {
+    blkio = /sys/fs/cgroup/blkio;
+}
+
+group sysdefault {
+    perm {
+        task {
+            uid = lunr;
+            gid = lunr;
+        }
+        admin {
+            uid = lunr;
+            gid = lunr;
+        }
+    }
+    blkio {
+        blkio.throttle.write_iops_device="";
+        blkio.throttle.read_iops_device="";
+    }
+}

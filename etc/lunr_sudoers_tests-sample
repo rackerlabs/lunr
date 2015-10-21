@@ -1,0 +1,13 @@
+# This file defines the cmds needed to run the testlunr/integration suite
+#
+# To prevent issues which may break sudo access on your system, it's recommened
+# to add these commands using 'visudo -f /etc/sudoers.d/lunr_sudoers'.
+#
+# See the sudoers man page for more details.
+#
+
+Cmnd_Alias LUNRTESTCMDS = /sbin/pvs,        \
+                          /sbin/pvremove,   \
+                          /sbin/vgremove
+
+lunr ALL = (root) NOPASSWD: LUNRTESTCMDS

@@ -1,0 +1,69 @@
+#! /bin/sh
+### BEGIN INIT INFO
+# Provides:          lunr-api
+# Required-Start:    $remote_fs $syslog
+# Required-Stop:     $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Orbit, the maintenance droid for lunr
+# Description:       Orbit runs periodic maintenance jobs for the lunr project
+### END INIT INFO
+
+# Author: Derrick Wippler <thrawn01@gmail.com>
+
+# Do NOT "set -e"
+
+# PATH should only include /usr/* if it runs after the mountnfs.sh script
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
+DESC="LUNR Orbit Daemon"
+NAME="lunr-orbit"
+DAEMON="/usr/bin/lunr-orbit"
+PIDDIR=/var/run/lunr
+USER=lunr
+GROUP=lunr
+DAEMON_ARGS="-c /etc/lunr/orbit.conf -p $PIDDIR/orbit.pid -u $USER"
+
+# make sure the pid dir exists and is writable
+mkdir -p $PIDDIR
+chown -R "$USER:$GROUP" $PIDDIR
+
+# Exit if the package is not installed
+[ -x "$DAEMON" ] || exit 0
+
+# Load the VERBOSE setting and other rcS variables
+. /lib/init/vars.sh
+
+# Define LSB log_* functions.
+# Depend on lsb-base (>= 3.0-6) to ensure that this file is present.
+. /lib/lsb/init-functions
+
+start ()
+{
+    [ "$VERBOSE" != no ] && log_daemon_msg "Starting $DESC" "$NAME"
+    $DAEMON $DAEMON_ARGS start
+}
+
+stop () 
+{
+    [ "$VERBOSE" != no ] && log_daemon_msg "Stopping $DESC" "$NAME"
+    $DAEMON $DAEMON_ARGS stop
+}
+
+case "$1" in
+	start)
+		start
+		;;
+	stop)
+		stop
+		;;
+	status)
+        $DAEMON $DAEMON_ARGS status
+		;;
+	restart)
+        stop
+        start
+	    ;;
+	*)
+		echo "Usage: $0 {start|stop|restart}"
+		exit 1
+esac

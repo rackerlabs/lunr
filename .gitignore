@@ -1,0 +1,20 @@
+*.sw?
+*.pyc
+*.egg-info
+.coverage
+doc/build/
+*.conf
+*.db*
+# Related to building debian packages
+build/
+*.substvars
+*.debhelper
+*.debhelper.log
+debian/files
+debian/lunr-api/
+debian/lunr-worker/
+debian/lunr-storage/
+debian/python-lunr/
+debian/tmp/
+# PyCharm/Idea IDE
+.idea/

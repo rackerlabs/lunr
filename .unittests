@@ -1,0 +1,7 @@
+#!/bin/bash
+
+nosetests $(dirname $0)/testlunr/unit --exe --with-coverage --cover-package lunr \
+    --cover-erase --cover-inclusive $@
+RV=$?
+rm -f .coverage
+exit $RV

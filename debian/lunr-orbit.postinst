@@ -1,0 +1,7 @@
+#!/bin/sh -e
+
+#DEBHELPER#
+
+if ! getent passwd lunr > /dev/null ; then
+  adduser --system --quiet --disabled-password --group lunr
+fi

@@ -1,0 +1,3 @@
+#!/bin/bash
+
+nosetests $(dirname $0)/testlunr/functional --exe -vsx $@

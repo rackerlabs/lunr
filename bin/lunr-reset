@@ -1,0 +1,38 @@
+#!/bin/bash
+# Copyright (c) 2011-2015 Rackspace US, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+sudo iscsiadm -m node --logout
+sudo service iscsitarget stop
+sudo service iscsi-target stop
+echo -n  > /etc/iet/ietd.conf
+sudo lvdisplay -c lunr-volume lunr1 lunr2 lunr3 lunr4 nova-volumes 2> \
+    /dev/null | awk -F'( *)|:' '{print $2}' | sudo xargs lvremove -f
+sudo service iscsitarget start
+sudo service iscsi-target start
+sudo service cgconfig restart
+
+lunr-manage version_control 2> /dev/null
+lunr-manage upgrade
+
+LUNR_DIR=$(dirname $(readlink -f $0))/..
+$LUNR_DIR/lunr/db/console.py -c 'db.query(Backup).delete(); \
+db.query(Export).delete(); db.query(Volume).delete(); \
+db.query(Account).delete(); \
+db.query(Node).filter(Node.status=="DELETED").delete(); \
+db.add(db.merge(VolumeType("vtype", status="ACTIVE"))); \
+db.query(VolumeType).filter(VolumeType.status=="DELETED").delete(); \
+db.commit()'
+rm -fr /etc/lunr/backups /etc/lunr/run/

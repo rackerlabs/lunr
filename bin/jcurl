@@ -1,0 +1,6 @@
+#!/bin/bash
+BUFFER=$(mktemp)
+trap "rm $BUFFER" EXIT
+if ! curl --silent --show-error $@ | tee $BUFFER | python -m 'json.tool'; then
+    cat $BUFFER ; echo ; false
+fi

@@ -1,0 +1,21 @@
+# Added for lunr logging {destinations}
+ destination df_local0 { file("/var/log/lunr/$HOST.log"); };
+ destination df_local0_err { file("/var/log/lunr/$HOST.error"); };
+
+ # Added for lunr logging {filters}
+ filter f_local0 { facility(local0) and (level(info) or level(debug)); };
+ filter f_local0_err { facility(local0) and not (level(info) or level(debug)); };
+
+ # Added for lunr logging {logs}
+ # local0.info/debug                        -  /var/log/lunr/$HOST.log
+ log {
+         source(s_src);
+         filter(f_local0);
+         destination(df_local0);
+ };
+ # local0.error                       -  /var/log/lunr/$HOST.error
+ log {
+         source(s_src);
+         filter(f_local0_err);
+         destination(df_local0_err);
+ }; 

@@ -1,0 +1,7 @@
+# source test.conf
+export API_HOST='localhost'
+export API_PORT='8080'
+export STORAGE_HOST='localhost'
+export STORAGE_PORT='8081'
+export VOLUME_TYPE='vtype'
+export API_SKIP_ADMIN='false'

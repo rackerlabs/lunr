@@ -1,0 +1,17 @@
+pastedeploy==1.5.2
+paste==1.7.5.1
+routes==1.12.3
+pastescript==1.7.5
+sqlalchemy==0.8.2
+webob==1.2.3
+simplejson==3.3.0
+prettytable==0.7.2
+sqlalchemy-migrate==0.8.2
+lz4==0.7.0
+iso8601==0.1.10
+setproctitle==1.0.1
+python-glanceclient==0.11.0
+netaddr==0.7.12
+mock
+coverage
+nose
