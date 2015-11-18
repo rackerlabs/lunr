@@ -482,6 +482,25 @@ class TestVolumeController(unittest.TestCase):
         self.assertEqual(res.body['id'], 'test')
         self.assertEqual(res.body['size'], 123)
 
+    def test_validate_force_node(self):
+        n = db.models.Node('mynode', 100, volume_type=self.vtype,
+                           hostname='10.127.0.72', port=8152)
+        self.db.add(n)
+        self.db.commit()
+
+        c = Controller({'account_id': self.account_id, 'id': 'test'},
+                self.mock_app)
+        req = Request.blank('?force_node=%s' % n.id)
+        force_node = c._validate_force_node(req.params)
+        self.assertEquals(force_node, n.id)
+        req = Request.blank('?force_node=%s' % n.name)
+        force_node = c._validate_force_node(req.params)
+        self.assertEquals(force_node, n.name)
+        req = Request.blank('?force_node=garbage')
+        self.assertRaises(HTTPPreconditionFailed, c._validate_force_node,
+                          req.params)
+
+
     def test_validate_affinity(self):
         c = Controller({'account_id': self.account_id, 'id': 'test'},
                 self.mock_app)
@@ -828,6 +847,21 @@ class TestVolumeController(unittest.TestCase):
         affinity = 'different_group:%s,%s' % (v1.id, v2.id)
         self.assertRaises(HTTPInsufficientStorage, c.get_recommended_nodes,
                           self.vtype.name, 1, affinity=affinity)
+
+    def test_recommended_nodes_force_node(self):
+        self.mock_app.fill_strategy = 'deep_fill'
+        c = Controller({'account_id':  self.account_id}, self.mock_app)
+        node = self.node0
+
+        nodes = c.get_recommended_nodes(self.vtype.name, 1,
+                                        force_node=node.name)
+        self.assertEqual(len(nodes), 1)
+        self.assertEqual(nodes[0].id, node.id)
+
+        nodes = c.get_recommended_nodes(self.vtype.name, 1,
+                                        force_node=node.id)
+        self.assertEqual(len(nodes), 1)
+        self.assertEqual(nodes[0].id, node.id)
 
 
 class TestVolumeApi(WsgiTestBase):

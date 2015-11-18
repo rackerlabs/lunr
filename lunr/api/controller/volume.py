@@ -22,7 +22,7 @@ from webob.exc import HTTPPreconditionFailed, HTTPConflict, HTTPNotFound, \
     HTTPServiceUnavailable, HTTPBadRequest
 from webob import Response
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 
 from lunr.api.controller.base import BaseController, NodeError
 from lunr.common import logger
@@ -124,6 +124,18 @@ class VolumeController(BaseController):
 
         return size
 
+    def _validate_force_node(self, params):
+        force_node = params.get('force_node')
+        if not force_node:
+            return None
+        try:
+            self.db.query(Node).filter(or_(Node.id == force_node,
+                                           Node.name == force_node)).one()
+        except NoResultFound:
+            raise HTTPPreconditionFailed('Invalid force_node: %s' % force_node)
+
+        return force_node
+
     def _validate_affinity(self, params):
         affinity = params.get('affinity')
         if not affinity:
@@ -211,6 +223,7 @@ class VolumeController(BaseController):
         source = self._validate_source(request.params)
         size = self._validate_size(request.params, volume_type, backup, source)
         affinity = self._validate_affinity(request.params)
+        force_node = self._validate_force_node(request.params)
         image_id = request.params.get('image_id')
         status = 'NEW'
         imaging = False
@@ -222,7 +235,8 @@ class VolumeController(BaseController):
 
         nodes = self.get_recommended_nodes(volume_type.name, size,
                                            imaging=imaging,
-                                           affinity=affinity)
+                                           affinity=affinity,
+                                           force_node=force_node)
 
         volume = Volume(id=self.id, account_id=self.account_id, status=status,
                         volume_type=volume_type, size=size, image_id=image_id,
