@@ -215,14 +215,20 @@ class Volume(ModelBase):
     account_id = Column(ForeignKey("account.id"), nullable=False)
     restore_of = Column(String(36), nullable=True)
     image_id = Column(String(36), nullable=True)
+    name = Column(String(255), nullable=True)
 
     def __init__(self, size=0, volume_type_name=DEFAULT_VOLUME_TYPE, **kwargs):
+        if 'id' not in kwargs:
+            kwargs['id'] = str(uuid4())
+        if 'name' not in kwargs:
+            kwargs['name'] = kwargs['id']
+
         ModelBase.__init__(self, size=size,
                            volume_type_name=volume_type_name, **kwargs)
 
     def __repr__(self):
-        return "<%s: %sGB %s %s>" % (self.id, self.size, self.status,
-                                     self.volume_type_name)
+        return "<%s:%s %sGB %s %s>" % (self.id, self.name, self.size,
+                                       self.status, self.volume_type_name)
 
     def active_backup_count(self):
         def func(x, y):

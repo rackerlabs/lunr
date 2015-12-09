@@ -194,6 +194,45 @@ class TestVolumeController(unittest.TestCase):
         self.assertEqual(res.body[0]['id'], volume.id)
         self.assertEqual(res.body[0]['restore_of'], 'foo')
 
+    def test_index_name_and_cinder_host(self):
+        cinder_host = 'somehost'
+        name = 'somehostvolume'
+        n = db.models.Node('somehostnode', 1000, volume_type=self.vtype,
+                           hostname='10.127.0.99', port=8099,
+                           cinder_host=cinder_host)
+        # Two volumes, same name
+        v1 = db.models.Volume(node=self.node0, account=self.account,
+                              status='ACTIVE', size=1, name=name)
+        v2 = db.models.Volume(node=n, account=self.account,
+                              status='ACTIVE', size=1, name=name)
+        # One one the right node, different name
+        v3 = db.models.Volume(node=n, account=self.account,
+                              status='ACTIVE', size=1)
+        self.db.add_all([n, v1, v2])
+        self.db.commit()
+
+        # Query by name
+        c = Controller({'account_id':  self.account_id, 'id': 'test'},
+                       self.mock_app)
+        req = Request.blank('?name=%s' % name)
+        res = c.index(req)
+        self.assertEqual(len(res.body), 2)
+        vol_ids = (v1.id, v2.id,)
+        self.assertEqual((res.body[0]['id'], res.body[1]['id']), vol_ids)
+
+        # Query by cinder_host
+        req = Request.blank('?cinder_host=%s' % cinder_host)
+        res = c.index(req)
+        self.assertEqual(len(res.body), 2)
+        vol_ids = (v2.id, v3.id,)
+        self.assertEqual((res.body[0]['id'], res.body[1]['id']), vol_ids)
+
+        # Query by both
+        req = Request.blank('?cinder_host=%s&name=%s' % (cinder_host, name))
+        res = c.index(req)
+        self.assertEqual(len(res.body), 1)
+        self.assertEqual(res.body[0]['id'], v2.id)
+
     def test_create_success(self):
         c = Controller({'account_id': self.account_id, 'id': 'test'},
                        self.mock_app)
@@ -401,6 +440,29 @@ class TestVolumeController(unittest.TestCase):
         req = Request.blank('?account_id=%s' % new_account_id)
         self.assertRaises(HTTPNotFound, c.update, req)
 
+    def test_validate_name(self):
+        c = Controller({'account_id': self.account_id, 'id': 'test'},
+                       self.mock_app)
+        req = Request.blank('')
+        valid_name = c._validate_name(req.params)
+        # default to id
+        self.assertEqual(valid_name, 'test')
+        name = 'aSDf'
+        req = Request.blank('?name=%s' % name)
+        valid_name = c._validate_name(req.params)
+        self.assertEqual(valid_name, name)
+        # only allow alphanumeric and dashes
+        name = 'asdf_42'
+        req = Request.blank('?name=%s' % name)
+        self.assertRaises(HTTPPreconditionFailed, c._validate_name, req.params)
+        # only allow alphanumeric and dashes
+        name = 'asdf*+42'
+        req = Request.blank('?name=%s' % name)
+        self.assertRaises(HTTPPreconditionFailed, c._validate_name, req.params)
+        name = 'asdf  2'
+        req = Request.blank('?name=%s' % name)
+        self.assertRaises(HTTPPreconditionFailed, c._validate_name, req.params)
+
     def test_validate_volume_type_limits(self):
         n = db.models.Node('bignode', 10000, volume_type=self.vtype,
                            hostname='10.127.0.72', port=8152)
@@ -457,6 +519,30 @@ class TestVolumeController(unittest.TestCase):
                 }, self.mock_app)
         req = Request.blank('')
         self.assertRaises(HTTPNotFound, c.delete, req)
+
+    def test_delete_different_name(self):
+        volume_id = 'test'
+        volume_name = 'nottest'
+        c = Controller({'account_id': self.account_id, 'id': volume_id},
+                       self.mock_app)
+        req = Request.blank(
+            '?size=1&volume_type_name=vtype&name=%s' % volume_name)
+        c.create(req)
+        c = Controller({'account_id': self.account_id, 'id': volume_id},
+                       self.mock_app)
+        req = Request.blank('')
+
+        node_request_path = []
+        def raise_exc(self, node, method, path, **kwargs):
+            node_request_path.append(path)
+            raise base.NodeError(MockRequest(), URLError("something bad"))
+
+        with patch(Controller, 'node_request', raise_exc):
+            self.assertRaises(base.NodeError, c.delete, req)
+
+        self.assertEquals(str(node_request_path[0]),
+                          '/volumes/%s' % volume_name)
+
 
     def test_delete_no_node_restore_of(self):
         volume = db.models.Volume(node=None, account=self.account,
@@ -767,6 +853,22 @@ class TestVolumeApi(WsgiTestBase):
         resp = self.request("/v1.0/account/volumes")
         self.assertEqual(resp.code, 200)
         self.assertEqual(resp.body, [])
+
+    def test_create_different_name(self):
+        volume_id = 'test'
+        volume_name = 'nottest'
+        node_request_path = []
+        def raise_exc(self, node, method, path, **kwargs):
+            node_request_path.append(path)
+            raise base.NodeError(MockRequest(), URLError("something bad"))
+
+        with patch(Controller, 'node_request', raise_exc):
+            resp = self.request("/v1.0/account/volumes/%s" % volume_id, 'PUT',
+                                {'size': 1, 'volume_type_name': 'vtype',
+                                 'name': volume_name})
+
+        self.assertEquals(str(node_request_path[0]),
+                          '/volumes/%s' % volume_name)
 
     def test_create_no_storage_nodes_avail(self):
         def return_empty(*args, **kwargs):

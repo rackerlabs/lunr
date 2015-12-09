@@ -411,7 +411,9 @@ class ToolConsole(Console, Displayable):
             # Get the status of the volume from the storage node
             (payload, node) = self.node_request(volume['node_id'],
                                                 '/volumes/%s' % volume['id'])
-            results.append({'volume': volume['id'], 'size': volume['size'],
+            results.append({'volume_id': volume['id'],
+                            'volume': volume['name'],
+                            'size': volume['size'],
                             'node': "http://%s:%s" % (node['hostname'],
                                                       node['port']),
                             'in-use': self._is_connected(payload),

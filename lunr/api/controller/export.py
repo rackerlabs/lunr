@@ -53,7 +53,7 @@ class ExportController(BaseController):
         ip = self._validate_ip(request.params.get('ip'))
 
         resp = self.node_request(volume.node, 'PUT',
-                                 '/volumes/%s/export' % volume.id, ip=ip)
+                                 '/volumes/%s/export' % volume.name, ip=ip)
 
         params = {
             'status': 'ATTACHING',
@@ -85,7 +85,7 @@ class ExportController(BaseController):
             initiator = request.params.get('initiator', '')
             self.node_request(
                 volume.node,
-                'DELETE', '/volumes/%s/export' % volume.id,
+                'DELETE', '/volumes/%s/export' % volume.name,
                 force=force,
                 initiator=initiator)
         except NodeError, e:
@@ -130,7 +130,7 @@ class ExportController(BaseController):
 
         try:
             node_export = self.node_request(volume.node, 'GET',
-                                            '/volumes/%s/export' % volume.id)
+                                            '/volumes/%s/export' % volume.name)
         except NodeError, e:
             logger.info('Node error fetching export: %s' % volume.id)
             node_export = {}

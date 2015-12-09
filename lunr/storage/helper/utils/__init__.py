@@ -19,6 +19,7 @@ import subprocess
 
 from json import loads
 from httplib import HTTPException
+from StringIO import StringIO
 from urllib import urlencode
 from urllib2 import urlopen, Request, HTTPError, URLError
 from uuid import uuid4
@@ -131,9 +132,30 @@ def execute(cmd, *args, **kwargs):
     return out.rstrip()
 
 
+def lookup_id(id, api_server, cinder_host):
+    params = {'name': id, 'cinder_host': cinder_host}
+    resource = 'volumes?%s' % urlencode(params)
+    resp = make_api_request(resource, api_server=api_server)
+    volumes = loads(resp.read())
+    found = None
+    for volume in volumes:
+        if volume['status'] !='DELETED':
+            if found:
+                raise HTTPError('unused', 409, 'Conflict',
+                                {}, StringIO('{"reason": "conflict"}'))
+            found = volume
+    if not found:
+        raise HTTPError('unused', 404, 'Not Found',
+                        {}, StringIO('{"reason": "not found"}'))
+    return found['id']
+
+
 def make_api_request(resource, id=None, data=None, method=None,
-                     api_server='http://localhost:8080/'):
+                     api_server='http://localhost:8080/', cinder_host=None):
     admin_url = api_server.rstrip('/') + '/v1.0/admin/'
+    if resource == 'volumes' and id:
+        # Translate from lv_name to API volume id
+        id = lookup_id(id, api_server, cinder_host)
     resource += '/%s' % id if id else ''
     if data is not None:
         data = urlencode(data)

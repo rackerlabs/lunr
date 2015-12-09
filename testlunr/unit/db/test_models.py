@@ -158,6 +158,33 @@ class TestAccount(ModelTest):
 
 class TestVolume(ModelTest):
 
+    def test_default_id(self):
+        a = models.Account()
+        vtype = models.VolumeType('vtype')
+        v = models.Volume(account=a, volume_type_name=vtype.name)
+        self.db.add_all([a, vtype, v])
+        self.db.commit()
+        self.assert_(v.id)
+
+    def test_default_name(self):
+        a = models.Account()
+        vtype = models.VolumeType('vtype')
+        v = models.Volume(account=a, volume_type_name=vtype.name)
+        self.db.add_all([a, vtype, v])
+        self.db.commit()
+        self.assert_(v.name)
+        self.assertEquals(v.name, v.id)
+
+    def test_name(self):
+        a = models.Account()
+        vtype = models.VolumeType('vtype')
+        name = 'mylittlevolume'
+        v = models.Volume(account=a, volume_type_name=vtype.name, name=name)
+        self.db.add_all([a, vtype, v])
+        self.db.commit()
+        self.assert_(v.id)
+        self.assertEquals(v.name, name)
+
     def test_foreign_keys(self):
         a = models.Account()
         v = models.Volume(account=a, volume_type_name='thisdoesntexist')

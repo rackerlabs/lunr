@@ -99,7 +99,7 @@ class BackupController(BaseController):
             backup = self.db.query(Backup).get(self.id)
 
         try:
-            path = '/volumes/%s/backups/%s' % (backup.volume.id, backup.id)
+            path = '/volumes/%s/backups/%s' % (backup.volume.name, backup.id)
             params = {
                 'account': self.account_id,
                 'timestamp': int(mktime(backup.created_at.timetuple())),
@@ -133,7 +133,7 @@ class BackupController(BaseController):
             raise HTTPConflict("Cannot delete backup '%s' during restoring"
                                % self.id)
 
-        path = '/volumes/%s/backups/%s' % (backup.volume.id, backup.id)
+        path = '/volumes/%s/backups/%s' % (backup.volume.name, backup.id)
         # start background job to delete the chunks from swift
         self.node_request(backup.volume.node, 'DELETE', path,
                           account=self.account_id)
