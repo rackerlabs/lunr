@@ -167,11 +167,11 @@ class VolumeController(BaseController):
         if volume.image_id:
             request_params['image_id'] = volume.image_id
         if backup:
-            request_params['backup_source_volume_id'] = backup.volume.id
+            request_params['backup_source_volume_id'] = backup.volume.name
             request_params['backup_id'] = backup.id
             volume.restore_of = backup.id
         if source:
-            request_params['source_volume_id'] = source.id
+            request_params['source_volume_id'] = source.name
             request_params['source_host'] = source.node.hostname
             request_params['source_port'] = source.node.port
 

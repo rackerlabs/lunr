@@ -150,10 +150,18 @@ def lookup_id(id, api_server, cinder_host):
     return found['id']
 
 
+def _is_translatable_resource(resource):
+    if resource == 'volumes':
+        return True
+    if resource.startswith('backups/') and resource.endswith('/restores'):
+        return True
+    return False
+
+
 def make_api_request(resource, id=None, data=None, method=None,
                      api_server='http://localhost:8080/', cinder_host=None):
     admin_url = api_server.rstrip('/') + '/v1.0/admin/'
-    if resource == 'volumes' and id:
+    if id and _is_translatable_resource(resource):
         # Translate from lv_name to API volume id
         id = lookup_id(id, api_server, cinder_host)
     resource += '/%s' % id if id else ''
