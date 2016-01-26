@@ -164,6 +164,24 @@ class TestVolume(ModelTest):
         self.db.add(v)
         self.assertRaises(IntegrityError, self.db.commit)
 
+    def test_active_backup_count(self):
+        vt = models.VolumeType('lunr')
+        a = models.Account()
+        n = models.Node('lunr', 10, volume_type=vt, hostname='127.0.0.1',
+                        port=8080)
+        v = models.Volume(account=a, size=1, volume_type=vt, node=n)
+        b1 = models.Backup(volume=v, status='AVAILABLE')
+        b2 = models.Backup(volume=v, status='AVAILABLE')
+        b3 = models.Backup(volume=v, status='NOTAVAILABLE')
+        b4 = models.Backup(volume=v, status='SOMETHING')
+        b5 = models.Backup(volume=v, status='AVAILABLE')
+        b6 = models.Backup(volume=v, status='AUDITING')
+        b7 = models.Backup(volume=v, status='DELETED')
+        self.db.add_all([a, n, v, b1, b2, b3, b4, b5, b6, b7])
+        self.db.commit()
+        self.db.refresh(v)
+        self.assertEquals(5, v.active_backup_count())
+
 
 class TestExport(ModelTest):
 
