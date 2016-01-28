@@ -100,8 +100,8 @@ class ISCSIDevice(object):
             os.lseek(src, 0, os.SEEK_SET)
 
             for block in xrange(0, size, block_size):
-                if block % 100 == 0:  # Every 1000 Blocks
-                    percent = float(block) / size * 1000
+                if block % 1000 == 0:  # Every 1000 Blocks
+                    percent = float(block) / size * 100
                     logger.debug('cur_pos = %s (%d%%)' % (block, percent))
                     if callback:
                         callback(percent)
