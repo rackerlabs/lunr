@@ -31,6 +31,7 @@ from urlparse import urlparse
 from urllib import urlencode
 from functools import wraps
 from json import loads
+from StringIO import StringIO
 import sys
 import os
 
@@ -45,6 +46,21 @@ class Console(SubCommand):
         self.opt('-v', '--verbose', action='count',
                  help="be verbose (-vv is more verbose)")
         self.opt('-u', '--url', default=None, help="lunr admin api url")
+
+    def lookup_id(self, id):
+        params = {'name': id}
+        volumes = self.request('/volumes', params=params)
+        found = None
+        for volume in volumes:
+            if volume['status'] !='DELETED':
+                if found:
+                    raise HTTPError('unused', 409, 'Conflict',
+                                    {}, StringIO('{"reason": "conflict"}'))
+                found = volume
+        if not found:
+            raise HTTPError('unused', 404, 'Not Found',
+                            {}, StringIO('{"reason": "not found"}'))
+        return found['id']
 
     def node_request(self, id, uri, **kwargs):
         warn_on_errors = kwargs.pop('warn_on_errors', True)
@@ -295,13 +311,22 @@ class VolumeConsole(Console, Displayable):
         """ List all volumes for everyone """
         filters = self.remove(args, ['config', 'verbose', 'url'])
         resp = self.request('/volumes', params=self.unused(filters))
-        self.display(resp, ['id', 'status', 'size', 'volume_type_name'])
+        self.display(resp, ['id', 'name', 'status', 'size', 'volume_type_name'])
 
     @opt('id', help="id of the volume to get")
     def get(self, id):
         """ List details for a specific volume """
         # Get volume info
-        resp = self.request('/volumes/%s' % id)
+        resp = None
+        try:
+            resp = self.request('/volumes/%s' % id)
+        except Exception, e:
+            print 'exception:', repr(e)
+            if e.code == 404:
+                volume_id = self.lookup_id(id)
+                resp = self.request('/volumes/%s' % volume_id)
+            else:
+                raise
         self.display(resp)
         # Get the node info for this volume
         print "\n-- Node %s --" % resp['node_id']
@@ -311,7 +336,16 @@ class VolumeConsole(Console, Displayable):
     @opt('id', help="id of the volume to delete")
     def delete(self, id):
         """ Delete a specific volume """
-        resp = self.request('/volumes/%s' % id, method='DELETE')
+        try:
+            resp = self.request('/volumes/%s' % id, method='DELETE')
+        except Exception, e:
+            print 'exception:', repr(e)
+            if e.code == 404:
+                volume_id = self.lookup_id(id)
+                resp = self.request('/volumes/%s' % volume_id,
+                                    method='DELETE')
+            else:
+                raise
         self.display(resp)
 
 
@@ -322,18 +356,43 @@ class ExportConsole(Console, Displayable):
     def get(self, id):
         """ List export details for a specific volume """
         # Get export info
-        resp = self.request('/volumes/%s/export' % id)
+        try:
+            resp = self.request('/volumes/%s/export' % id)
+        except Exception, e:
+            print 'exception:', repr(e)
+            if e.code == 404:
+                volume_id = self.lookup_id(id)
+                resp = self.request('/volumes/%s/export' % volume_id)
+            else:
+                raise
         self.display(resp)
 
     @opt('id', help="id of the volume to create export")
     def create(self, id):
         """Create an export for a specific volume"""
-        self.request('/volumes/%s/export' % id, method='PUT')
+        try:
+            self.request('/volumes/%s/export' % id, method='PUT')
+        except Exception, e:
+            print 'exception:', repr(e)
+            if e.code == 404:
+                volume_id = self.lookup_id(id)
+                self.request('/volumes/%s/export' % volume_id, method='PUT')
+            else:
+                raise
 
     @opt('id', help="id of the volume to delete export")
     def delete(self, id):
         """Delete an export for a specific volume"""
-        self.request('/volumes/%s/export' % id, method='DELETE')
+        try:
+            self.request('/volumes/%s/export' % id, method='DELETE')
+        except Exception, e:
+            print 'exception:', repr(e)
+            if e.code == 404:
+                volume_id = self.lookup_id(id)
+                self.request('/volumes/%s/export' % volume_id,
+                             method='DELETE')
+            else:
+                raise
 
 
 class BackupConsole(Console, Displayable):
@@ -428,7 +487,16 @@ class ToolConsole(Console, Displayable):
     @opt('id', help="volume id")
     def volume(self, id):
         """ Display all available information about the volume """
-        volume = self.request('/volumes/%s' % id)
+        volume_id = id
+        try:
+            volume = self.request('/volumes/%s' % id)
+        except Exception, e:
+            print 'exception:', repr(e)
+            if e.code == 404:
+                volume_id = self.lookup_id(id)
+                volume = self.request('/volumes/%s' % volume_id)
+            else:
+                raise
         (payload, node) = self.node_request(volume['node_id'],
                                             '/volumes/%s/export' %
                                             volume['id'],
