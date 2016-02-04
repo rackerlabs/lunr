@@ -140,10 +140,6 @@ class VolumeController(BaseController):
                 raise HTTPNotFound("Cannot transfer non-existent volume '%s'" %
                                    self.id)
 
-            if volume.active_backup_count() > 0:
-                msg = "Volume must have no backups to modify account_id"
-                raise HTTPPreconditionFailed(msg)
-
     def _assign_node(self, volume, backup, source, nodes):
         """
         Assigns the new volume to a node.
