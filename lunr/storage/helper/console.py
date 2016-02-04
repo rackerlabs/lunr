@@ -511,7 +511,7 @@ class ToolsConsole(Console, Displayable):
         need to be cleaned up
         """
         helper = self.load_conf(self.config)
-        first = audit.snapshots(helper)
+        first = audit.snapshots(helper, self.verbose)
         if not len(first):
             return 0
 
@@ -534,8 +534,9 @@ class ToolsConsole(Console, Displayable):
             lvs = [lv for lv in helper.volumes._scan_volumes()
                    if lv['origin'] != '']
             for snap in first:
-                lv = audit.find(snap['snapshot'], lvs)
-                helper.volumes.remove_lvm_snapshot(lv)
+                for lv in lvs:
+                    if lv[snap['id']] == snap['snapshot']:
+                        helper.volumes.remove_lvm_snapshot(lv)
         return 1
 
     @noargs

@@ -149,10 +149,15 @@ class VolumeController(BaseController):
             source_port = req.params['source_port']
         except KeyError:
             raise HTTPBadRequest("Must specify source_port")
+        try:
+            restart = (req.params['restart'] != '')
+        except KeyError:
+            restart = False
         return {
             'id': source_volume_id,
             'host': source_host,
             'port': source_port,
+            'restart': restart,
         }
 
     @lock("volumes/%(id)s/resource")
@@ -193,7 +198,8 @@ class VolumeController(BaseController):
             try:
                 self.helper.volumes.create(self.id, **params)
             except AlreadyExists, e:
-                raise HTTPConflict(str(e))
+                if not source['restart']
+                    raise HTTPConflict(str(e))
 
             volume = self.helper.volumes.get(self.id)
             logger.debug('Created new volume %s to be clone of %s'
