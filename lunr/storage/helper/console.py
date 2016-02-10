@@ -567,7 +567,7 @@ class ToolsConsole(Console, Displayable):
             os.kill(pid, signal.SIGTERM)
             print "-- Killed PID: %d" % pid
             attempts += 1
-            time.sleep(1)
+            sleep(1)
             if attempts > 5:
                 print "Attempted to kill '%d'; trying `kill -9`"
                 os.kill(pid, signal.SIGKILL)
