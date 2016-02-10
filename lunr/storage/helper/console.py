@@ -586,10 +586,6 @@ class ToolsConsole(Console, Displayable):
         client.update('volumes', id, 'available')
         print "-- Marking clone volume '%s' in lunr as ACTIVE" % id
         helper.make_api_request('volumes', id, data={'status': 'ACTIVE'})
-        # Delete the clone volume
-        if not skip_delete:
-            print "-- Deleting clone volume '%s' via cinder" % id
-            client.delete_volume(id)
 
     @opt('-C', '--clean', default=False, action='store_const',
          const=True, help='Scrub and remove any non transient snapshots')
