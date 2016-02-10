@@ -128,6 +128,18 @@ class VolumeController(BaseController):
             raise HTTPPreconditionFailed(msg)
         return affinity
 
+    def _validate_transfer(self, params):
+        if 'account_id' in params:
+            account = self.db.get_or_create_account(params['account_id'])
+            if account.status != 'ACTIVE':
+                raise HTTPNotFound('Account is not ACTIVE')
+
+            try:
+                volume = self.account_query(Volume).filter_by(id=self.id).one()
+            except NoResultFound:
+                raise HTTPNotFound("Cannot transfer non-existent volume '%s'" %
+                                   self.id)
+
     def _assign_node(self, volume, backup, source, nodes):
         """
         Assigns the new volume to a node.
@@ -284,6 +296,8 @@ class VolumeController(BaseController):
 
         Update volume info
         """
+        self._validate_transfer(request.params)
+
         update_params, meta_params = filter_update_params(request, Volume)
         num_updated = self.account_query(Volume).\
             filter_by(id=self.id).update(update_params)

@@ -204,7 +204,7 @@ class Volume(ModelBase):
         'mysql_engine': 'InnoDB',
         'mysql_charset': 'utf8',
     })
-    __immutable_columns__ = ['id', 'node_id', 'account_id']
+    __immutable_columns__ = ['id', 'node_id']
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
     status = Column(String(32), default='NEW')
@@ -223,6 +223,11 @@ class Volume(ModelBase):
     def __repr__(self):
         return "<%s: %sGB %s %s>" % (self.id, self.size, self.status,
                                      self.volume_type_name)
+
+    def active_backup_count(self):
+        def func(x, y):
+            return x if y.status in ('AUDITING', 'DELETED') else x + 1
+        return reduce(func, self.backups, 0)
 
 
 @DateFields

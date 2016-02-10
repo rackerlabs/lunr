@@ -381,6 +381,26 @@ class TestVolumeController(unittest.TestCase):
         self.assert_(res.body['node_id'], self.node0.id)
         self.assert_(res.body['status'], 'CLONING')
 
+    def test_transfer_success(self):
+        volume = db.models.Volume(node=self.node0, account=self.account,
+                                  status='ACTIVE', size=1)
+        self.db.add(volume)
+        self.db.commit()
+        c = Controller({'account_id': self.account_id, 'id': volume.id},
+                       self.mock_app)
+        new_account_id = 'new_account_id'
+        req = Request.blank('?account_id=%s' % new_account_id)
+        res = c.update(req)
+        self.assertEqual(res.body['id'], volume.id)
+        self.assertEqual(res.body['account_id'], new_account_id)
+
+    def test_transfer_404(self):
+        c = Controller({'account_id': self.account_id, 'id': 'missing'},
+                       self.mock_app)
+        new_account_id = 'new_account_id'
+        req = Request.blank('?account_id=%s' % new_account_id)
+        self.assertRaises(HTTPNotFound, c.update, req)
+
     def test_validate_volume_type_limits(self):
         n = db.models.Node('bignode', 10000, volume_type=self.vtype,
                            hostname='10.127.0.72', port=8152)
