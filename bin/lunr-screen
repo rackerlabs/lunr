@@ -19,6 +19,10 @@ if screen -r lunr > /dev/null; then
     exit 0
 fi
 
+if [ -f /opt/lunrvenv/lunr/bin/activate ]; then
+    source /opt/lunrvenv/lunr/bin/activate
+fi
+
 # Find an rc file
 for SCREENRC in $LUNR_SCREENRC $HOME/lunr.screenrc /etc/lunr/lunr.screenrc \
     $(dirname $0)/../etc/lunr.screenrc-sample; do

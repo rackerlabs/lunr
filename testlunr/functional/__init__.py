@@ -20,6 +20,7 @@ except ImportError:
     SkipTest = Exception
 
 from lunr.common.jsonify import loads
+from lunr.common.config import Config
 from tempfile import mkdtemp
 from shutil import rmtree
 from time import sleep
@@ -76,7 +77,9 @@ class LunrApiService(object):
 class LunrTestCase(unittest.TestCase):
 
     def setUp(self):
-        pass
+        # Default the config to the local user and our current dir
+        self.volume_type = os.environ.get('API_VOLUME_TYPE','vtype')
+        self.skip_admin = Config.to_bool(os.environ.get('API_SKIP_ADMIN', 'false'))
 
     def tearDown(self):
         pass

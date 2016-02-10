@@ -27,10 +27,9 @@
 # -------------------------------------------------------------------
 
 from testlunr.functional import LunrTestCase, SkipTest, LunrApiService
-from lunr.common.config import Config
 from lunr.storage.helper.utils import execute
 from socket import gethostbyname
-from lunr.common import config
+from lunr.common.config import Config
 from uuid import uuid4
 from lunr import db
 import unittest

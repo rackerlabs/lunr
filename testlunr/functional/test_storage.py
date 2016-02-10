@@ -175,10 +175,13 @@ class TestVolumeController(StorageServerTestCase):
         self.assert_(volume in target)
 
         # iscsi initator discovery should not find our volume
-        out = execute('iscsiadm', mode='discovery', type='sendtargets',
-                      portal=host_ip)
-
-        self.assertNotIn(volume, out)
+        try:
+            out = execute('iscsiadm', mode='discovery', type='sendtargets',
+                          portal=host_ip)
+            self.assertNotIn(volume, out)
+        except ProcessError, e:
+            # Newer iscsiadm (than precise) throws an error on no targets
+            self.assertEquals(e.errcode, 21)
 
         # clean up
         self.delete('volumes/%s/export' % volume)
