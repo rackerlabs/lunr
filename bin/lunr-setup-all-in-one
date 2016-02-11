@@ -14,38 +14,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#set -x
+set -x
+
+USE_VIRTUAL_ENV='yes'
+
+# These get messed with based on virtualenv above
+LUNR_BINDIR='/usr/local/bin'
+PYTHON_CMD=$(which python)
 
 WORKING_DIR=$(cd $(dirname "$0") && pwd)
 
-# Install required packages
+# Install system packages
 sudo apt-get install lvm2 iscsitarget open-iscsi python-pip\
-    cgroup-bin screen curl qemu-utils blktap-utils --yes --force-yes
+    cgroup-bin screen curl qemu-utils blktap-utils\
+    python-dev libmysqlclient-dev libffi-dev libssl-dev --yes --force-yes
+
 
 DISTRO=$(lsb_release -c -s)
 if [[ ${DISTRO} =~ (oneiric|precise) ]]; then
     sudo apt-get install iscsitarget-dkms --yes --force-yes
-fi
-
-# If precise install requirements via pip
-if [[ ${DISTRO} =~ (precise|trusty) ]]; then
-    # Install required pip packages
-    for package in `cat $WORKING_DIR/../requirements.txt`;
-        do pip install $package;
-    done
-fi
-
-# If oneiric or lucid, install requirements via ubuntu repo
-if [[ ${DISTRO} =~ (oneiric|lucid) ]]; then
-    sudo apt-get install python-setuptools python-pastescript \
-    python-sqlalchemy python-webob python-coverage python-nose \
-    python-simplejson python-prettytable python-setproctitle \
-    python-migrate python-routes --yes --force-yes
-fi
-
-# Lucid has an old version of routes, install a later version
-if [[ ${DISTRO} =~ (lucid) ]]; then
-    sudo pip install "routes>=1.12"
 fi
 
 ISCSI="/etc/default/iscsitarget"
@@ -53,14 +40,38 @@ if [ ! -f $ISCSI ]; then
     echo "$ISCSI missing; iscsitarget package is not installed?"
     exit 1
 fi
+
 sudo sed -i "s/false/true/" $ISCSI
 sudo service iscsitarget start
 
-# set working directory to lunr src root
+# Lunr
+if [[ $USE_VIRTUAL_ENV = 'yes' ]]; then
+  if ! cd /opt/lunrvenv ; then
+    sudo mkdir -p /opt/lunrvenv
+    sudo chown -R $USER:$USER /opt/lunrvenv
+  fi
+
+  pip install --upgrade virtualenv
+
+
+  if ! cd /opt/lunrvenv/lunr ; then
+    virtualenv /opt/lunrvenv/lunr
+  fi
+  source /opt/lunrvenv/lunr/bin/activate
+
+  LUNR_BINDIR=/opt/lunrvenv/lunr/bin
+  PYTHON_CMD=$LUNR_BINDIR/python
+fi
+
 cd $WORKING_DIR/..
 
-# Package lunr project
-sudo python setup.py develop
+pip install --upgrade -r $WORKING_DIR/../requirements.txt
+pip install MySQL-python
+
+python setup.py develop
+
+# set working directory to lunr src root
+cd $WORKING_DIR/..
 
 # Create and own /etc/lunr
 sudo mkdir /etc/lunr
@@ -85,13 +96,8 @@ export LUNR_CONFIG=/etc/lunr/lunr.conf
 # Set our current user to the lunr user
 sed -i "s/^#\s*user\s*=\s*lunr/user = $USER/" $LUNR_CONFIG
 
-# link some of the dev stuff into /usr/bin
-for file in jcurl lunr-reset lunr-screen; do
-    sudo ln -s $(pwd)/bin/${file} /usr/bin/${file}
-done
-
 # Setup device for storage server
-sudo ./bin/lunr-setup-storage --user=$USER
+sudo $PYTHON_CMD ./bin/lunr-setup-storage --user=$USER
 
 if [ $? -ne 0 ]; then
     echo "-- lunr-setup-storage failed, re-run with"
@@ -100,8 +106,8 @@ if [ $? -ne 0 ]; then
 fi
 
 # setup db
-lunr-manage version_control
-lunr-manage upgrade
+$LUNR_BINDIR/lunr-manage version_control
+$LUNR_BINDIR/lunr-manage upgrade
 
 # add vtype
 echo 'adding default volume type (vtype)'
@@ -113,7 +119,7 @@ for i in {1..10}; do
     fi
     sleep 1
 done
-lunr-admin types create vtype
+$LUNR_BINDIR/lunr-admin type create vtype
 screen -S lunr -X quit
 
 # deploy node
@@ -126,7 +132,7 @@ for i in {1..10}; do
     fi
     sleep 1
 done
-lunr-admin nodes deploy -a
+$LUNR_BINDIR/lunr-admin node deploy -a
 screen -S lunr -X quit
 
 echo "== Setup is complete =="

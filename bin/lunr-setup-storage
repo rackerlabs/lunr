@@ -139,6 +139,8 @@ def main():
                       help='set lvm volume group name')
     parser.add_option('--ietd-config', default=export.ietd_config,
                       help='set path to ietd.conf')
+    parser.add_option('--initiators-allow', default=export.initiators_allow,
+                      help='set path to iet initiators.allow')
     parser.add_option('--user',
                       help='set the user (and group) that will run the storage server')
     parser.add_option('--group', default=None,
@@ -179,6 +181,8 @@ usermod -a -G disk %(user)s
 touch %(ietd_config)s
 chgrp %(group)s %(ietd_config)s
 chmod g+w %(ietd_config)s
+chgrp %(group)s %(initiators_allow)s
+chmod g+w %(initiators_allow)s
 """.strip().splitlines()
 
     lvm_commands = """

@@ -41,11 +41,12 @@ class LunrBackupTestCase(LunrTestCase):
 
     @classmethod
     def setUpClass(cls):
+        volume_type = os.environ.get('API_VOLUME_TYPE','vtype')
         conf = LunrConfig.from_api_conf()
         sess = db.configure(conf)
         # Change the min_size to 0, so we can
         # create volumes smaller than a gig
-        query = sess.query(VolumeType).filter_by(name='vtype')
+        query = sess.query(VolumeType).filter_by(name=volume_type)
         # Save the original value
         cls._min_size = query.one().min_size
         # Set min_size to 0
@@ -54,8 +55,9 @@ class LunrBackupTestCase(LunrTestCase):
 
     @classmethod
     def tearDownClass(cls):
+        volume_type = os.environ.get('API_VOLUME_TYPE','vtype')
         # Restore the original min_size
-        db.Session.query(VolumeType).filter_by(name='vtype')\
+        db.Session.query(VolumeType).filter_by(name=volume_type)\
             .update({'min_size': cls._min_size})
         db.Session.commit()
 
@@ -106,7 +108,7 @@ class LunrBackupTestCase(LunrTestCase):
         # create a volume
         resp = self.request('dev/volumes/%s' % volume_id, 'PUT', {
                 'size': 1,
-                'volume_type_name': 'vtype'
+                'volume_type_name': self.volume_type
             })
         self.assertCode(resp, 200)
         self.assertEquals(resp.body['status'], 'ACTIVE')
@@ -148,7 +150,7 @@ class LunrBackupTestCase(LunrTestCase):
         resp = self.request('dev/volumes/%s' % restore_id, 'PUT', {
                 'backup': backup_id,
                 'size': 1,
-                'volume_type_name': 'vtype'
+                'volume_type_name': self.volume_type
             })
 
         self.assertCode(resp, 200)
@@ -212,7 +214,7 @@ class LunrBackupTestCase(LunrTestCase):
         # create vol1
         resp = self.request('dev/volumes/%s' % volume_one, 'PUT', {
                 'size': 0,
-                'volume_type_name': 'vtype'
+                'volume_type_name': self.volume_type
             })
         self.assertEquals(resp.code // 100, 2)
         self.assertEquals(resp.body['status'], 'ACTIVE')
@@ -265,7 +267,7 @@ class LunrBackupTestCase(LunrTestCase):
         resp = self.request('dev/volumes/%s' % volume_two, 'PUT', {
                 'backup': backup_one,
                 'size': 0,
-                'volume_type_name': 'vtype'
+                'volume_type_name': self.volume_type
             })
 
         self.assertEquals(resp.code // 100, 2)
@@ -279,7 +281,7 @@ class LunrBackupTestCase(LunrTestCase):
         resp = self.request('dev/volumes/%s' % volume_three, 'PUT', {
                 'backup': backup_two,
                 'size': 0,
-                'volume_type_name': 'vtype'
+                'volume_type_name': self.volume_type
             })
 
         self.assertEquals(resp.code // 100, 2)
@@ -333,7 +335,7 @@ class LunrBackupTestCase(LunrTestCase):
         resp = self.request('dev/volumes/%s' % volume_four, 'PUT', {
                 'backup': backup_two,
                 'size': 0,
-                'volume_type_name': 'vtype'
+                'volume_type_name': self.volume_type
             })
         self.assertEquals(resp.code // 100, 2)
         self.assertEquals(resp.body['status'], 'BUILDING')
