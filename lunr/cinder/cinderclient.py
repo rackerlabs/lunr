@@ -195,6 +195,13 @@ class CinderClient(object):
                                                     key)
         return self.request('DELETE', path, headers, None)
 
+    def delete_volume(self, volume_id):
+        headers = {'content-type': 'application/json',
+                   'X-Auth-Token': self.token}
+        path = '%s/v1/%s/volumes/%s' % (self.cinder_url, self.tenant_id,
+                                        volume_id)
+        return self.request('DELETE', path, headers, None)
+
 
 def get_args(conf):
     return {

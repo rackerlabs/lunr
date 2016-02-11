@@ -39,9 +39,12 @@ from time import time, sleep
 
 import logging
 import random
+import signal
+import errno
 import uuid
 import sys
 import os
+import re
 
 
 log = logger.get_logger()
@@ -502,6 +505,85 @@ class ToolsConsole(Console, Displayable):
         helper = self.load_conf(self.config)
         client = helper.get_cinder(account=account)
         client.update('snapshots', snapshot, status)
+
+    @opt('id', help="The volume uuid of the clone (dest volume)")
+    def cancel_clone(self, id):
+        def clone_pid(id):
+            for line in execute('ps', 'aux').split('\n'):
+                if re.search('lunr-clone.*%s' % id, line):
+                    return int(re.split('\s*', line)[1])
+            raise RuntimeError("Unable to find pid for lunr-clone '%s'" % id)
+
+        def dm_device(pid):
+            for line in execute('lsof', '-p', str(pid)).split('\n'):
+                if re.search('/dev/dm-', line):
+                    return re.split('\s*', line)[8].lstrip('/dev/')
+            raise RuntimeError("DM for lunr-clone pid '%s' not found" % pid)
+
+        def snapshot_uuid(dm):
+            for dir_path, dir_names, file_names in os.walk("/dev/mapper"):
+                for file in file_names:
+                    try:
+                        path = os.path.join(dir_path, file)
+                        link = os.readlink(path)
+                        if re.search(dm, link):
+                            return re.sub('--', '-', file)\
+                                .lstrip('lunr-volume-')
+                    except OSError:
+                        pass
+            raise RuntimeError("Unable to find snapshot_uuid for DM '%s'" % dm)
+
+        def from_iscsi_connection(id):
+            for line in execute('iscsiadm', '-m', 'session').split('\n'):
+                if re.search(id, line):
+                    conn = re.split('\s*', line)
+                    ip, port, _ = re.split(':|,', conn[2])
+                    print conn[3], ip, port
+                    return ISCSIDevice(conn[3], ip, port)
+            raise RuntimeError("Unable to find iscsi connection for '%s'" % id)
+
+        def is_running(pid):
+            try:
+                os.kill(pid, 0)
+                return True
+            except OSError as err:
+                if err.errno == errno.ESRCH:
+                    return False
+                raise
+
+        helper = self.load_conf(self.config)
+        # Find the clone process
+        pid = clone_pid(id)
+        # Find the snapshots device mapper name
+        dm = dm_device(pid)
+        # Find the uuid of the snapshot from the DM
+        snapshot_id = snapshot_uuid(dm)
+        # Kill the process
+        attempts = 0
+        while is_running(pid):
+            print "-- PID is running: %d" % pid
+            os.kill(pid, signal.SIGTERM)
+            print "-- Killed PID: %d" % pid
+            attempts += 1
+            sleep(1)
+            if attempts > 5:
+                print "Attempted to kill '%d'; trying `kill -9`"
+                os.kill(pid, signal.SIGKILL)
+
+        # Disconnect from the clone volume
+        iscsi = from_iscsi_connection(id)
+        iscsi.disconnect()
+        # Get the snapshot info
+        snapshot = helper.volumes.get(snapshot_id)
+        print "-- Snapshot to Scrub and Delete: %s" % snapshot['id']
+        # Remove the lvm snapshot
+        helper.volumes.remove_lvm_snapshot(snapshot)
+        # Mark the clone volume as active
+        print "-- Marking clone volume '%s' in cinder as available" % id
+        client = helper.get_cinder()
+        client.update('volumes', id, 'available')
+        print "-- Marking clone volume '%s' in lunr as ACTIVE" % id
+        helper.make_api_request('volumes', id, data={'status': 'ACTIVE'})
 
     @opt('-C', '--clean', default=False, action='store_const',
          const=True, help='Scrub and remove any non transient snapshots')
