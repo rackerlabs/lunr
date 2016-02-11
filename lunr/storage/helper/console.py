@@ -506,10 +506,8 @@ class ToolsConsole(Console, Displayable):
         client = helper.get_cinder(account=account)
         client.update('snapshots', snapshot, status)
 
-    @opt('--skip-delete', default=False, help="Do not delete the cloned volume"
-         "after cancel")
     @opt('id', help="The volume uuid of the clone (dest volume)")
-    def cancel_clone(self, id, skip_delete):
+    def cancel_clone(self, id):
         def clone_pid(id):
             for line in execute('ps', 'aux').split('\n'):
                 if re.search('lunr-clone.*%s' % id, line):
