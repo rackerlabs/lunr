@@ -36,7 +36,8 @@ class LunrJSONEncoder(JSONEncoder):
         if hasattr(obj, '__json__') and callable(obj.__json__):
             return obj.__json__()
         elif isinstance(obj, (datetime.date, datetime.datetime)):
-            return str(obj)
+            # Return ISO8601 format
+            return obj.strftime('%Y-%m-%dT%H:%M:%S')
         elif isinstance(obj, decimal.Decimal):
             return float(obj)
         elif isinstance(obj, MultiDict):
