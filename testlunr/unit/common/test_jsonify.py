@@ -30,7 +30,7 @@ class TestJsonify(unittest.TestCase):
     def test_jsonify_date(self):
         data = datetime.date(2013, 1, 1)
         json_data = jsonify.encode(data)
-        self.assertEqual('"2013-01-01"', json_data)
+        self.assertEqual('"2013-01-01T00:00:00"', json_data)
 
     def test_jsonify_decimal(self):
         data = decimal.Decimal('5.15')
