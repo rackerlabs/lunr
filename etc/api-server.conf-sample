@@ -49,6 +49,9 @@ fill_percentage_limit = 0.5
 #fill_strategy = broad_fill
 #image_convert_limit = 1
 
+[backup]
+# per_volume_limit = 100
+
 [storage]
 # node_timeout = 120
 

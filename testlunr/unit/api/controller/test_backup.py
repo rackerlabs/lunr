@@ -19,8 +19,7 @@ import unittest
 from urllib import urlencode
 from urllib2 import HTTPError
 from webob import Request
-from webob.exc import HTTPNotFound, HTTPUnprocessableEntity, \
-    HTTPPreconditionFailed
+from webob.exc import HTTPNotFound, HTTPPreconditionFailed
 import json
 
 from lunr import db
@@ -35,6 +34,10 @@ from lunr.common.config import LunrConfig
 from testlunr.unit import patch, WsgiTestBase
 
 
+#from lunr.common import logger
+#logger.configure(log_to_console=True, capture_stdio=False)
+
+
 class MockApp(object):
     def __init__(self):
         self.conf = LunrConfig(
@@ -43,6 +46,7 @@ class MockApp(object):
         self.helper = db.configure(self.conf)
         self.fill_percentage_limit = 0.5
         self.node_timeout = None
+        self.backups_per_volume = 10
 
 
 class MockResponse(object):
@@ -273,10 +277,10 @@ class TestBackupController(unittest.TestCase):
             'volume': volume_id,
         }
         req = Request.blank('?%s' % urlencode(params))
-        self.assertRaises(HTTPUnprocessableEntity, c.create, req)
+        self.assertRaises(HTTPPreconditionFailed, c.create, req)
         try:
             c.create(req)
-        except HTTPUnprocessableEntity, e:
+        except HTTPPreconditionFailed, e:
             self.assert_(volume_id in e.detail)
 
     def test_create_backup_invalid_volume(self):
@@ -289,10 +293,10 @@ class TestBackupController(unittest.TestCase):
             'volume': volume.id,
         }
         req = Request.blank('?%s' % urlencode(params))
-        self.assertRaises(HTTPUnprocessableEntity, c.create, req)
+        self.assertRaises(HTTPPreconditionFailed, c.create, req)
         try:
             c.create(req)
-        except HTTPUnprocessableEntity, e:
+        except HTTPPreconditionFailed, e:
             self.assert_(volume.id in e.detail)
 
     def test_create_backup_imaging_scrub(self):
@@ -366,6 +370,46 @@ class TestBackupController(unittest.TestCase):
         backup = self.db.query(db.models.Backup).get('backup1')
         self.assertEquals(backup, None)
 
+    def test_per_volume_limit(self):
+        volume = self.create_volume('ACTIVE')
+
+        # 8 active
+        for i in range(8):
+            backup_id = 'backup%s' % i
+            b = db.models.Backup(volume, id=backup_id, status='ACTIVE')
+            self.db.add(b)
+
+        # 1 DELETING
+        b = db.models.Backup(volume, id='backup8', status='DELETING')
+        self.db.add(b)
+        b = db.models.Backup(volume, id='backup9', status='AUDITING')
+        self.db.add(b)
+        b = db.models.Backup(volume, id='backup10', status='DELETED')
+        self.db.add(b)
+        b = db.models.Backup(volume, id='backup11', status='AUDITING')
+        self.db.add(b)
+        self.db.commit()
+
+        c = Controller({'account_id': self.account.id, 'id': 'backup12'},
+                       self.mock_app)
+        params = {'volume': volume.id}
+        req = Request.blank('?%s' % urlencode(params))
+        resp = c.create(req)
+        self.assertEquals(resp.body['account_id'], self.account.id)
+        self.assertEquals(resp.body['volume_id'], volume.id)
+        self.assertEquals(resp.body['id'], 'backup12')
+        self.assertEquals(resp.body['status'], 'SAVING')
+
+        c = Controller({'account_id': self.account.id, 'id': 'backup13'},
+                       self.mock_app)
+        params = {'volume': volume.id}
+        req = Request.blank('?%s' % urlencode(params))
+        self.assertRaises(HTTPPreconditionFailed, c.create, req)
+        try:
+            c.create(req)
+        except HTTPPreconditionFailed, e:
+            self.assert_(volume.id in e.detail)
+
     def test_delete_backup_success(self):
         volume = self.create_volume('ACTIVE')
         # create controller
@@ -431,15 +475,62 @@ class TestBackupController(unittest.TestCase):
 class TestBackupApi(WsgiTestBase):
 
     def setUp(self):
+        self._orig_urlopen = base.urlopen
+        base.urlopen = self.mock_urlopen = MockUrlopen()
         self.test_conf = LunrConfig(
-            {'auto_create': True, 'db': {'url': 'sqlite://'}})
+            {'db': {'auto_create': True, 'url': 'sqlite://'},
+             'backup': {'per_volume_limit': 10 }})
         self.app = ApiWsgiApp(self.test_conf, urlmap)
+        self.vtype = db.models.VolumeType('vtype')
+        db.Session.add(self.vtype)
+        db.Session.commit()
+        self.node = db.models.Node('somenode',
+                                   100000000000,
+                                   volume_type=self.vtype,
+                                   port=8080,
+                                   hostname='127.0.0.1')
+        db.Session.add(self.node)
+        self.account = db.models.Account(id='someaccount')
+        db.Session.add(self.account)
+        db.Session.commit()
+
+    def tearDown(self):
+        base.urlopen = self._orig_urlopen
+        db.Session.remove()
 
     def test_admin_cant_create(self):
         resp = self.request("/v1.0/admin/backups/test", 'PUT', {
                 'volume': 'foo'
             })
         self.assertEquals(resp.code, 405)
+
+    def test_backups_per_volume(self):
+        v1 = db.models.Volume(0, 'vtype', id='v1', account=self.account,
+                              status='ACTIVE', node=self.node)
+        db.Session.add(v1)
+        db.Session.commit()
+
+        resp = self.request("/v1.0/someaccount/backups/b1", 'PUT', {
+                'volume': 'v1'
+            })
+        self.assertEquals(resp.code, 200)
+
+        v2 = db.models.Volume(0, 'vtype', id='v2', account=self.account,
+                              status='ACTIVE', node=self.node)
+        db.Session.add(v2)
+        db.Session.commit()
+        for i in range(10):
+            backup_id = 'backup%s' % i
+            b = db.models.Backup(v2, id=backup_id, status='ACTIVE')
+            db.Session.add(b)
+        db.Session.commit()
+
+        resp = self.request("/v1.0/someaccount/backups/b2", 'PUT', {
+                'volume': 'v2'
+            })
+        self.assertEquals(resp.code, 412)
+        self.assertEquals(resp.body['reason'],
+                          "Volume 'v2' already has 10 out of 10 allowed backups")
 
 
 if __name__ == "__main__":

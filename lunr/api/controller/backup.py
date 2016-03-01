@@ -17,8 +17,7 @@
 from time import mktime
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import and_, not_
-from webob.exc import HTTPNotImplemented, HTTPUnprocessableEntity, HTTPError, \
-    HTTPPreconditionFailed, HTTPNotFound, HTTPConflict, HTTPBadRequest
+from webob.exc import HTTPPreconditionFailed, HTTPNotFound, HTTPConflict
 from webob import Response
 
 from lunr.api.controller.base import BaseController, NodeError
@@ -59,14 +58,22 @@ class BackupController(BaseController):
             volume = self.account_query(Volume).\
                 filter_by(id=volume_id).one()
         except NoResultFound:
-            raise HTTPUnprocessableEntity("Cannot create backup for "
-                                          "non-existent volume '%s'" %
-                                          volume_id)
+            raise HTTPPreconditionFailed("Cannot create backup for "
+                                         "non-existent volume '%s'" %
+                                         volume_id)
 
         if volume.status not in ('ACTIVE', 'IMAGING_SCRUB'):
-            raise HTTPUnprocessableEntity(
+            raise HTTPPreconditionFailed(
                 "Status of volume '%s' is '%s', not ACTIVE" % (
                     volume.id, volume.status))
+
+        backup_count = volume.active_backup_count()
+        if backup_count >= self.app.backups_per_volume:
+            raise HTTPPreconditionFailed(
+                "Volume '%s' already has %s out of %s allowed backups" % (
+                    volume_id,
+                    backup_count,
+                    self.app.backups_per_volume))
 
         params = {
             'id': self.id,

@@ -41,6 +41,7 @@ class ApiWsgiApp(LunrWsgiApp):
         self.image_convert_limit = conf.int('placement',
                                             'image_convert_limit', 1)
         self.node_timeout = conf.float('storage', 'node_timeout', 120)
+        self.backups_per_volume = conf.int('backup', 'per_volume_limit', 100)
 
     def _get_helper(self, conf):
         return db.configure(conf)
