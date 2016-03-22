@@ -97,6 +97,7 @@ class Helper(object):
         # name of node registration
         self.name = conf.string('storage', 'name', socket.gethostname())
         self.affinity_group = conf.string('storage', 'affinity_group', '')
+        self.maintenance_zone = conf.string('storage', 'maintenance_zone', '')
 
         # management interface
         self.management_host = conf.string('server:main', 'host', '0.0.0.0')
@@ -162,6 +163,7 @@ class Helper(object):
             'size': bytes_to_gibibytes(self.volumes.status()['vg_size']),
             'cinder_host': self.cinder_host,
             'affinity_group': self.affinity_group,
+            'maintenance_zone': self.maintenance_zone,
         }
 
     def _register(self, node_id=None, data=None):
