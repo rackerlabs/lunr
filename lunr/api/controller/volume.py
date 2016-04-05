@@ -15,18 +15,19 @@
 
 
 import random
+import re
 import urllib2
 
 from webob.exc import HTTPPreconditionFailed, HTTPConflict, HTTPNotFound, \
     HTTPServiceUnavailable, HTTPBadRequest
 from webob import Response
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 
 from lunr.api.controller.base import BaseController, NodeError
 from lunr.common import logger
 from lunr.db import NoResultFound
-from lunr.db.models import Volume, VolumeType, Backup
+from lunr.db.models import Volume, VolumeType, Backup, Node
 from lunr.db.helpers import filter_update_params
 
 
@@ -40,12 +41,21 @@ class VolumeController(BaseController):
         """
         q = self.account_query(Volume)
         available_filters = set(['status', 'account_id', 'node_id', 'id',
-                                 'restore_of'])
+                                 'restore_of', 'name'])
         filters = dict((k, v) for k, v in request.params.items() if k in
                        available_filters)
         if filters:
             q = q.filter_by(**filters)
+        cinder_host = request.params.get('cinder_host')
+        if cinder_host:
+            q = q.join(Node).filter(Node.cinder_host == cinder_host)
         return Response([dict(r) for r in q.all()])
+
+    def _validate_name(self, params):
+        name = params.get('name', self.id)
+        if not re.match("^[A-Za-z0-9-]+$", name):
+            raise HTTPPreconditionFailed("Invalid name '%s'" % name)
+        return name
 
     def _validate_volume_type(self, params):
         try:
@@ -114,6 +124,18 @@ class VolumeController(BaseController):
 
         return size
 
+    def _validate_force_node(self, params):
+        force_node = params.get('force_node')
+        if not force_node:
+            return None
+        try:
+            self.db.query(Node).filter(or_(Node.id == force_node,
+                                           Node.name == force_node)).one()
+        except NoResultFound:
+            raise HTTPPreconditionFailed('Invalid force_node: %s' % force_node)
+
+        return force_node
+
     def _validate_affinity(self, params):
         affinity = params.get('affinity')
         if not affinity:
@@ -157,11 +179,11 @@ class VolumeController(BaseController):
         if volume.image_id:
             request_params['image_id'] = volume.image_id
         if backup:
-            request_params['backup_source_volume_id'] = backup.volume.id
+            request_params['backup_source_volume_id'] = backup.volume.name
             request_params['backup_id'] = backup.id
             volume.restore_of = backup.id
         if source:
-            request_params['source_volume_id'] = source.id
+            request_params['source_volume_id'] = source.name
             request_params['source_host'] = source.node.hostname
             request_params['source_port'] = source.node.port
 
@@ -170,7 +192,7 @@ class VolumeController(BaseController):
             volume.node = node
             self.db.commit()  # prevent duplicate/lost volumes
             try:
-                path = '/volumes/%s' % self.id
+                path = '/volumes/%s' % volume.name
                 return self.node_request(node, 'PUT', path, **request_params)
             except NodeError, e:
                 last_node_error = e
@@ -195,11 +217,13 @@ class VolumeController(BaseController):
 
         Create volume
         """
+        name = self._validate_name(request.params)
         volume_type = self._validate_volume_type(request.params)
         backup = self._validate_backup(request.params)
         source = self._validate_source(request.params)
         size = self._validate_size(request.params, volume_type, backup, source)
         affinity = self._validate_affinity(request.params)
+        force_node = self._validate_force_node(request.params)
         image_id = request.params.get('image_id')
         status = 'NEW'
         imaging = False
@@ -211,10 +235,12 @@ class VolumeController(BaseController):
 
         nodes = self.get_recommended_nodes(volume_type.name, size,
                                            imaging=imaging,
-                                           affinity=affinity)
+                                           affinity=affinity,
+                                           force_node=force_node)
 
         volume = Volume(id=self.id, account_id=self.account_id, status=status,
-                        volume_type=volume_type, size=size, image_id=image_id)
+                        volume_type=volume_type, size=size, image_id=image_id,
+                        name=name)
         self.db.add(volume)
 
         # issue backend request(s)
@@ -228,6 +254,7 @@ class VolumeController(BaseController):
                 'size': size,
                 'volume_type_name': volume_type.name,
                 'image_id': image_id,
+                'name': name,
             }
             # optomistic lock
             count = self.db.query(Volume).\
@@ -265,7 +292,7 @@ class VolumeController(BaseController):
         else:
             try:
                 self.node_request(volume.node, 'DELETE', '/volumes/%s' %
-                                  volume.id)
+                                  volume.name)
             except NodeError, e:
                 if e.code == 404:
                     volume.status = 'DELETED'

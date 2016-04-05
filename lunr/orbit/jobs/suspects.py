@@ -112,7 +112,7 @@ class BackupSuspects(Suspects):
         node = volume.node
         return 'http://%s:%s/volumes/%s/backups/%s' % (node.hostname,
                                                        node.port,
-                                                       volume.id,
+                                                       volume.name,
                                                        backup.id)
 
     def run(self, now=None):
@@ -218,14 +218,14 @@ class ScrubSuspects(Suspects):
         try:
             for volume in self.suspects(self.span, now=now).all():
                 log.info("Long running scrub '%s' on node '%s'"
-                         % (volume.id, volume.node.id))
+                         % (volume.name, volume.node.id))
                 url = 'http://%s:%s/volumes/%s' % (volume.node.hostname,
                                                    volume.node.port,
-                                                   volume.id)
+                                                   volume.name)
                 # Make a volume create call to the storage server
                 if self.delete(url):
                     log.info("Restarted scrub job '%s' on node '%s'"
-                             % (volume.id, volume.node.id))
+                             % (volume.name, volume.node.id))
                     # Update last_modified so we don't restart next time we run
                     volume.last_modified = func.now()
             self._sess.commit()
@@ -261,7 +261,7 @@ class AuditSuspects(Suspects):
         volume = backup.volume
         node = volume.node
         return 'http://%s:%s/volumes/%s%s' \
-            % (node.hostname, node.port, volume.id, postfix)
+            % (node.hostname, node.port, volume.name, postfix)
 
     def locked(self, backup):
         # GET /volumes/{id}/lock
@@ -331,7 +331,7 @@ class PruneSuspects(Suspects):
         node = volume.node
         return 'http://%s:%s/volumes/%s%s' % (node.hostname,
                                               node.port,
-                                              volume.id,
+                                              volume.name,
                                               postfix)
 
     def url(self, backup):
@@ -339,7 +339,7 @@ class PruneSuspects(Suspects):
         node = volume.node
         return 'http://%s:%s/volumes/%s/backups/%s' % (node.hostname,
                                                        node.port,
-                                                       volume.id,
+                                                       volume.name,
                                                        backup.id)
 
     def locked(self, backup):

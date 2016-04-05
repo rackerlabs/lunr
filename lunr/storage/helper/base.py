@@ -119,6 +119,7 @@ class Helper(object):
 
     def make_api_request(self, *args, **kwargs):
         kwargs['api_server'] = kwargs.pop('api_server', self.api_server)
+        kwargs['cinder_host'] = kwargs.pop('cinder_host', self.cinder_host)
         attempt = 0
         while True:
             attempt += 1

@@ -19,6 +19,7 @@ import unittest
 
 from StringIO import StringIO
 from urllib2 import HTTPError
+from urlparse import urlparse, parse_qs
 
 from lunr.storage.helper import utils
 from lunr.storage.helper.utils import APIError
@@ -52,6 +53,103 @@ class TestUtils(unittest.TestCase):
                             {}, StringIO('{"reason": "not found"}'))
         with patch(utils, 'urlopen', mock_urlopen):
             self.assertRaises(APIError, utils.make_api_request, 'not_found')
+
+    def test_lookup_id(self):
+        cinder_host = 'cinder_host'
+        storage_vol_id = 'storage_vol_id'
+        api_vol_id = 'storage_vol_id'
+
+        def mock_make_api_request(resource, api_server=None):
+            query_string = urlparse(resource).query
+            params = parse_qs(query_string)
+            self.assertEquals(params, {'name': [storage_vol_id],
+                                       'cinder_host': [cinder_host]})
+            volumes = ('[{"id": "%s", "status": "ACTIVE"},'
+                       '{"id": "deleted", "status": "DELETED"}]' % api_vol_id)
+            mock_make_api_request.called = True
+            return StringIO(volumes)
+        mock_make_api_request.called = False
+
+        with patch(utils, 'make_api_request', mock_make_api_request):
+            lookup_id = utils.lookup_id(storage_vol_id, 'unused', cinder_host)
+
+        self.assertTrue(mock_make_api_request.called)
+        self.assertEquals(lookup_id, api_vol_id)
+
+    def test_lookup_id_deleted(self):
+        cinder_host = 'cinder_host'
+        storage_vol_id = 'storage_vol_id'
+        api_vol_id = 'storage_vol_id'
+
+        def mock_make_api_request(resource, data=None, api_server=None):
+            query_string = urlparse(resource).query
+            params = parse_qs(query_string)
+            self.assertEquals(params, {'name': [storage_vol_id],
+                                       'cinder_host': [cinder_host]})
+            volumes = ('[{"id": "%s", "status": "DELETED"},'
+                       '{"id": "deleted", "status": "DELETED"}]' % api_vol_id)
+            mock_make_api_request.called = True
+            return StringIO(volumes)
+        mock_make_api_request.called = False
+
+        with patch(utils, 'make_api_request', mock_make_api_request):
+            try:
+                utils.lookup_id(storage_vol_id, 'unused', cinder_host)
+            except HTTPError, e:
+                self.assertEquals(e.code, 404)
+                self.assertTrue(mock_make_api_request.called)
+            else:
+                self.fail("Should be unreached")
+
+    def test_lookup_id_409(self):
+        cinder_host = 'cinder_host'
+        storage_vol_id = 'storage_vol_id'
+
+        def mock_make_api_request(resource, data=None, api_server=None):
+            query_string = urlparse(resource).query
+            params = parse_qs(query_string)
+            self.assertEquals(params, {'name': [storage_vol_id],
+                                       'cinder_host': [cinder_host]})
+            volumes = ('[{"id": "deleting", "status": "DELETING"},'
+                       '{"id": "building", "status": "BUILDING"}]')
+            mock_make_api_request.called = True
+            return StringIO(volumes)
+        mock_make_api_request.called = False
+
+        with patch(utils, 'make_api_request', mock_make_api_request):
+            try:
+                utils.lookup_id(storage_vol_id, 'unused', cinder_host)
+            except HTTPError, e:
+                self.assertEquals(e.code, 409)
+                self.assertTrue(mock_make_api_request.called)
+            else:
+                self.fail("Should be unreached")
+
+    def test_make_api_request_volume_id(self):
+        volume_id = 'v1'
+        volume_name = 'volume_name'
+        cinder_host = 'node_cinder_host'
+
+        def mock_urlopen(req, data=None):
+            expected = 'http://localhost:8080/v1.0/admin/volumes/v1'
+            self.assertEquals(req.get_full_url(), expected)
+            mock_urlopen.called = True
+        mock_urlopen.called = False
+
+        def mock_lookup_id(id, api_server, cinder_host):
+            self.assertEquals(id, volume_name)
+            mock_lookup_id.called = True
+            return volume_id
+        mock_lookup_id.called = False
+
+        data = {'cinder_host': cinder_host, 'foo': 'bar'}
+
+        with patch(utils, 'urlopen', mock_urlopen):
+            with patch(utils, 'lookup_id', mock_lookup_id):
+                utils.make_api_request('volumes', volume_name, data=data)
+
+        self.assertTrue(mock_urlopen.called)
+        self.assertTrue(mock_lookup_id.called)
 
     def test_execute_sudo(self):
         execute_args = []

@@ -29,7 +29,7 @@ from lunr.db.models import Node, Volume, Account
 from lunr.common.jsonify import loads
 from lunr.common import logger
 from lunr.common.exc import NodeError
-from sqlalchemy import Float, and_
+from sqlalchemy import Float, and_, or_
 from sqlalchemy.sql import func, desc
 from sqlalchemy.sql.expression import cast, case, null
 
@@ -85,7 +85,7 @@ class BaseController(object):
             raise NodeError(req, e)
 
     def fill_strategy(self, type, volume_type_name, size, count,
-                      imaging=False, affinity=''):
+                      imaging=False, affinity='', force_node=None):
         volumes_used = func.coalesce(func.count(Volume.size), 0)
         storage_used = func.coalesce(func.sum(Volume.size), 0)
         fill_percent = ((cast(storage_used, Float) + size) / Node.size)
@@ -130,6 +130,8 @@ class BaseController(object):
                         filter(Volume.id.in_(affinity_rules))
                 q = q.having(~Node.affinity_group.in_(q1))
 
+        if force_node:
+            q = q.filter(or_(Node.name == force_node, Node.id == force_node))
 
         def sort(q):
             if type == 'deep_fill':
@@ -147,17 +149,17 @@ class BaseController(object):
         return sort(q).limit(count)
 
     def get_fill_strategy(self, volume_type_name, size, count, imaging=False,
-                          affinity=''):
+                          affinity='', force_node=None):
         if self.app.fill_strategy == 'deep_fill':
             return self.deep_fill(volume_type_name, size, count, imaging,
-                                  affinity)
+                                  affinity, force_node)
         return self.broad_fill(volume_type_name, size, count, imaging,
-                               affinity)
+                               affinity, force_node)
 
     def get_recommended_nodes(self, volume_type_name, size, count=3,
-                              imaging=False, affinity=''):
+                              imaging=False, affinity='', force_node=None):
         q = self.get_fill_strategy(volume_type_name, size, count, imaging,
-                                   affinity)
+                                   affinity, force_node)
         nodes = []
         for node, storage_used in q:
             node._storage_used = storage_used
