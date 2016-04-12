@@ -53,6 +53,11 @@ class CloneController(BaseController):
             raise HTTPBadRequest("Must specify mgmt_port")
         except KeyError:
             raise HTTPPreconditionFailed("Must specify mgmt_port")
+        # We're updating the status for a volume on a different node.
+        try:
+            cinder_host = req.params['cinder_host']
+        except KeyError:
+            raise HTTPBadRequest("Must specify cinder_host")
 
         cinder = None
         account = req.params.get('account')
@@ -63,7 +68,8 @@ class CloneController(BaseController):
             path = '/volumes/%s/export' % self.id
             self.helper.node_request(mgmt_host, mgmt_port, 'DELETE', path)
             self.helper.make_api_request('volumes', self.id,
-                                         data={'status': 'ACTIVE'})
+                                         data={'status': 'ACTIVE'},
+                                         cinder_host=cinder_host)
             if cinder:
                 cinder.delete_volume_metadata(self.id, 'clone-progress')
 

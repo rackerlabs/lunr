@@ -215,6 +215,7 @@ class VolumeController(BaseController):
                 # First dirty method to close the export.
                 'mgmt_host': self.helper.management_host,
                 'mgmt_port': self.helper.management_port,
+                'cinder_host': self.helper.cinder_host,
             }
             try:
                 self.helper.node_request(source['host'], source['port'],

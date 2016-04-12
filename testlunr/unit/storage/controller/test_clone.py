@@ -97,7 +97,7 @@ class TestCloneController(WsgiTestBase, BaseHelper):
         iqn = 'iqnfoo'
         iscsi_ip = 'ipfoo'
         url = ('/volumes/%s/clones/%s?iscsi_ip=%s&iqn=%s'
-               '&mgmt_host=%s&mgmt_port=%s' %
+               '&mgmt_host=%s&mgmt_port=%s&cinder_host=foo' %
                (self.sourcevol_id, targetvol_id, iscsi_ip,
                 iqn, 'fake_host', '42'))
         resp = self.request(url, method='PUT')
@@ -111,7 +111,7 @@ class TestCloneController(WsgiTestBase, BaseHelper):
         iqn = 'iqnfoo'
         iscsi_ip = 'ipfoo'
         url = ('/volumes/%s/clones/%s?iscsi_ip=%s&iqn=%s'
-               '&mgmt_host=%s&mgmt_port=%s' %
+               '&mgmt_host=%s&mgmt_port=%s&cinder_host=foo' %
                (self.sourcevol_id, targetvol_id, iscsi_ip,
                 iqn, 'fake_host', '42'))
         resp = self.request(url, method='PUT')
@@ -125,7 +125,7 @@ class TestCloneController(WsgiTestBase, BaseHelper):
         iqn = 'iqnfoo'
         iscsi_ip = 'ipfoo'
         url = ('/volumes/%s/clones/%s?iscsi_ip=%s&iqn=%s'
-               '&mgmt_host=%s&mgmt_port=%s' %
+               '&mgmt_host=%s&mgmt_port=%s&cinder_host=foo' %
                (self.sourcevol_id, targetvol_id, iscsi_ip,
                 iqn, 'fake_host', '42'))
         resp = self.request(url, method='PUT')
