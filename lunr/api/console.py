@@ -307,45 +307,42 @@ class VolumeConsole(Console, Displayable):
     @opt('-n', '--node-id', help="Filter the list by node_id")
     @opt('-i', '--id', help="Filter the list by volume id")
     @opt('-r', '--restore-of', help="Filter the list by restore_of")
+    @opt('-N', '--name', help="Filter the list by name")
     def list(self, args):
         """ List all volumes for everyone """
         filters = self.remove(args, ['config', 'verbose', 'url'])
         resp = self.request('/volumes', params=self.unused(filters))
-        self.display(resp, ['id', 'name', 'status', 'size', 'volume_type_name'])
+        self.display(resp, ['id', 'name', 'status',
+                            'size', 'volume_type_name'])
+
+    def _print_volume(self, volume):
+        self.display(volume)
+        # Get the node info for this volume
+        print "\n-- Node %s --" % volume['node_id']
+        node = self.request('/nodes/%s' % volume['node_id'])
+        self.display(node)
 
     @opt('id', help="id of the volume to get")
     def get(self, id):
         """ List details for a specific volume """
         # Get volume info
-        resp = None
-        try:
-            resp = self.request('/volumes/%s' % id)
-        except Exception, e:
-            print 'exception:', repr(e)
-            if e.code == 404:
+        volume = self.request('/volumes/%s' % id)
+        self._print_volume(volume)
+
+        if volume['status'] == 'DELETED':
+            try:
                 volume_id = self.lookup_id(id)
-                resp = self.request('/volumes/%s' % volume_id)
-            else:
-                raise
-        self.display(resp)
-        # Get the node info for this volume
-        print "\n-- Node %s --" % resp['node_id']
-        resp = self.request('/nodes/%s' % resp['node_id'])
-        self.display(resp)
+                volume = self.request('/volumes/%s' % volume_id)
+                print "\n-- Migrated volume %s --" % volume['id']
+                self._print_volume(volume)
+            except Exception, e:
+                if e.code != 404:
+                    raise
 
     @opt('id', help="id of the volume to delete")
     def delete(self, id):
         """ Delete a specific volume """
-        try:
-            resp = self.request('/volumes/%s' % id, method='DELETE')
-        except Exception, e:
-            print 'exception:', repr(e)
-            if e.code == 404:
-                volume_id = self.lookup_id(id)
-                resp = self.request('/volumes/%s' % volume_id,
-                                    method='DELETE')
-            else:
-                raise
+        resp = self.request('/volumes/%s' % id, method='DELETE')
         self.display(resp)
 
 
@@ -356,43 +353,29 @@ class ExportConsole(Console, Displayable):
     def get(self, id):
         """ List export details for a specific volume """
         # Get export info
-        try:
-            resp = self.request('/volumes/%s/export' % id)
-        except Exception, e:
-            print 'exception:', repr(e)
-            if e.code == 404:
+        resp = self.request('/volumes/%s/export' % id)
+        self.display(resp)
+
+        volume = self.request('/volumes/%s' % id)
+        if volume['status'] == 'DELETED':
+            try:
                 volume_id = self.lookup_id(id)
                 resp = self.request('/volumes/%s/export' % volume_id)
-            else:
-                raise
-        self.display(resp)
+                print "\n-- Migrated volume %s --" % volume['id']
+                self.display(resp)
+            except Exception, e:
+                if e.code != 404:
+                    raise
 
     @opt('id', help="id of the volume to create export")
     def create(self, id):
         """Create an export for a specific volume"""
-        try:
-            self.request('/volumes/%s/export' % id, method='PUT')
-        except Exception, e:
-            print 'exception:', repr(e)
-            if e.code == 404:
-                volume_id = self.lookup_id(id)
-                self.request('/volumes/%s/export' % volume_id, method='PUT')
-            else:
-                raise
+        self.request('/volumes/%s/export' % id, method='PUT')
 
     @opt('id', help="id of the volume to delete export")
     def delete(self, id):
         """Delete an export for a specific volume"""
-        try:
-            self.request('/volumes/%s/export' % id, method='DELETE')
-        except Exception, e:
-            print 'exception:', repr(e)
-            if e.code == 404:
-                volume_id = self.lookup_id(id)
-                self.request('/volumes/%s/export' % volume_id,
-                             method='DELETE')
-            else:
-                raise
+        self.request('/volumes/%s/export' % id, method='DELETE')
 
 
 class BackupConsole(Console, Displayable):
@@ -484,19 +467,7 @@ class ToolConsole(Console, Displayable):
                                 'node', 'in-use'])
         print "-- This account has no active volumes --"
 
-    @opt('id', help="volume id")
-    def volume(self, id):
-        """ Display all available information about the volume """
-        volume_id = id
-        try:
-            volume = self.request('/volumes/%s' % id)
-        except Exception, e:
-            print 'exception:', repr(e)
-            if e.code == 404:
-                volume_id = self.lookup_id(id)
-                volume = self.request('/volumes/%s' % volume_id)
-            else:
-                raise
+    def _print_volume(self, volume):
         (payload, node) = self.node_request(volume['node_id'],
                                             '/volumes/%s/export' %
                                             volume['id'],
@@ -515,6 +486,21 @@ class ToolConsole(Console, Displayable):
         self.display(volume, ['account_id', 'status', 'size', 'node_id',
                               'node-url', 'in-use', 'iqn', 'created_at',
                               'last_modified'])
+
+    @opt('id', help="volume id")
+    def volume(self, id):
+        """ Display all available information about the volume """
+        volume = self.request('/volumes/%s' % id)
+        self._print_volume(volume)
+        if volume['status'] == 'DELETED':
+            try:
+                volume_id = self.lookup_id(id)
+                volume = self.request('/volumes/%s' % volume_id)
+                print "\n-- Migrated volume %s --" % volume['id']
+                self._print_volume(volume)
+            except Exception, e:
+                if e.code != 404:
+                    raise
 
 
 def main(argv=sys.argv[1:]):
