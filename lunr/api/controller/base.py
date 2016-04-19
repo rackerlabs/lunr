@@ -134,7 +134,7 @@ class BaseController(object):
         if force_node:
             q = q.filter(or_(Node.name == force_node, Node.id == force_node))
         if maintenance_zone:
-            q = q.filter(or_(Node.maintenance_zone == maintenance_zone))
+            q = q.filter(Node.maintenance_zone == maintenance_zone)
 
         def sort(q):
             if type == 'deep_fill':
