@@ -101,6 +101,14 @@ class StorageServerTestCase(LunrTestCase):
             sleep(i)
         self.fail("%s never returned a code of '%s'" % (uri, code))
 
+    def wait_on_lock(self, uri):
+        for i in range(10):
+            resp = self.request(uri)
+            if not resp.body["in-use"]:
+                return
+            sleep(i)
+        self.fail("%s never released lock" % uri)
+
 
 class TestVolumeController(StorageServerTestCase):
 
@@ -369,6 +377,7 @@ class TestCloneController(StorageServerTestCase):
         target_md5 = self.md5sum(target)
         self.assertEquals(source_md5, target_md5)
 
+        self.wait_on_lock('volumes/%s/lock' % source_id)
         self.delete('volumes/%s' % source_id)
         self.wait_on_code('volumes/%s' % source_id, 404)
         self.delete('volumes/%s' % target_id)
