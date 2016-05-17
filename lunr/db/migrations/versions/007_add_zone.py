@@ -22,14 +22,14 @@ def upgrade(migrate_engine):
     meta = MetaData()
     meta.bind=migrate_engine
     nodes = Table('node', meta, autoload=True)
-    maintenance_zone = Column('maintenance_zone', String(255))
-    nodes.create_column(maintenance_zone)
+    zone = Column('zone', String(255))
+    nodes.create_column(zone)
 
 
 def downgrade(migrate_engine):
     meta = MetaData()
     meta.bind=migrate_engine
     nodes = Table('node', meta, autoload=True)
-    maintenance_zone = Column('maintenance_zone', String(255))
-    nodes.drop_column(maintenance_zone)
+    zone = Column('zone', String(255))
+    nodes.drop_column(zone)
 

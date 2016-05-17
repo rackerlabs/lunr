@@ -38,7 +38,7 @@ port = 8081
 # cinder_host = 
 # Update cinder and stats file every N blocks
 # stats_update_interval = 1000
-# maintenance_zone = 
+# zone = 
 
 [cinder]
 #username=demo

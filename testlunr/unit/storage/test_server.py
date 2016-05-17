@@ -184,7 +184,7 @@ class TestServeStorageApp(BaseServeApp):
                 'id': 'node1',
                 'cinder_host': '127.0.0.1',
                 'affinity_group': '',
-                'maintenance_zone': '',
+                'zone': '',
             },
         ]
         response_gen = iter(responses)
