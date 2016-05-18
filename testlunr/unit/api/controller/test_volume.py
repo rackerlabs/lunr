@@ -863,6 +863,35 @@ class TestVolumeController(unittest.TestCase):
         self.assertEqual(len(nodes), 1)
         self.assertEqual(nodes[0].id, node.id)
 
+    def test_recommended_nodes_zone(self):
+        self.mock_app.fill_strategy = 'deep_fill'
+        c = Controller({'account_id':  self.account_id}, self.mock_app)
+        nodes = c.get_recommended_nodes(self.vtype.name, 1)
+        node_ids = [node.id for node in nodes]
+        # Our test nodes are in order by size, 0 = 10, 1 = 11, etc.
+        expected_ids = [self.node0.id, self.node1.id, self.node2.id]
+        self.assertEqual(node_ids, expected_ids)
+        # Set up zones.
+        self.node0.zone = 'zone1'
+        self.node1.zone = 'zone1'
+        self.node2.zone = 'zone2'
+        self.db.add_all([self.node0, self.node1, self.node2])
+        self.db.commit()
+
+        nodes = c.get_recommended_nodes(self.vtype.name, 3,
+                                        zone='zone1')
+        self.assertEquals(2, len(nodes))
+        self.assertEquals(nodes[0].id, self.node0.id)
+        self.assertEquals(nodes[1].id, self.node1.id)
+
+        nodes = c.get_recommended_nodes(self.vtype.name, 1,
+                                        zone='zone2')
+        self.assertEquals(1, len(nodes))
+        self.assertEquals(nodes[0].id, self.node2.id)
+        # Recommendation fails.
+        self.assertRaises(HTTPInsufficientStorage, c.get_recommended_nodes,
+                          self.vtype.name, 1, zone='nothing')
+
 
 class TestVolumeApi(WsgiTestBase):
 
