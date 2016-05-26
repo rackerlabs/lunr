@@ -501,10 +501,12 @@ class VolumeHelper(object):
 
         size_str = self._get_size_str(size)
         tmp_vol = None
+        snet_glance = None
 
         if image_id:
             mgmt_glance = get_glance_conn(self.conf, tenant_id=account,
                                           glance_urls=self.glance_mgmt_urls)
+            snet_glance = get_glance_conn(self.conf, tenant_id=account)
             try:
                 glance_start = time()
                 image = mgmt_glance.head(image_id)
@@ -576,7 +578,6 @@ class VolumeHelper(object):
                   callback=callback_wrap, skip_fork=self.skip_fork)
         elif image_id:
             # TODO: clean up this volume if the spawn fails
-            snet_glance = get_glance_conn(self.conf, tenant_id=account)
             dest_volume = self.get(volume_id)
             spawn(lock, self.copy_image, dest_volume, image, snet_glance,
                   tmp_vol, scrub_callback, callback=callback_wrap,
