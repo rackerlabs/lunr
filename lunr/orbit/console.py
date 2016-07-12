@@ -16,6 +16,7 @@
 
 from lunr.orbit.jobs.suspects import AuditSuspects, BackupSuspects,\
         RestoreSuspects, ScrubSuspects, PruneSuspects
+from lunr.orbit.jobs.terminatedfeedreader import TerminatedFeedReader
 from lunr.orbit.daemon import Daemon, DaemonError
 from lunr.orbit.jobs.detach import Detach
 from lunr.common.config import LunrConfig
@@ -104,7 +105,8 @@ def main():
                          RestoreSuspects(conf, session),
                          ScrubSuspects(conf, session),
                          PruneSuspects(conf, session),
-                         Detach(conf, session)])
+                         Detach(conf, session),
+                         TerminatedFeedReader(conf, session)])
             # Run the cron
             return cron.run()
     except (DaemonError, CronError), e:
