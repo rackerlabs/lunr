@@ -44,18 +44,19 @@ class Feed(object):
 
         self.logger = logger
         self.feed_url = feed_url
-        self.timeout_seconds = int(conf.get('timeout_seconds', 10))
+        self.timeout_seconds = int(conf.string('cloudfeedsclient', 'timeout_seconds', 10))
         self.auth_token = auth_token
         self.etag = etag
         self.new_etag = None
         self.processed_events = []
         self.last_event = last_event
         self.read_forward = read_forward
-        self.feed_limit = conf.get('feed_limit', '25')
+        self.feed_limit = conf.int('cloudfeedsclient', 'feed_limit', 25)
 
     def get_connection(self, url):
         with timeout.Timeout(self.timeout_seconds):
             scheme, netloc, path, query, fragment = urlsplit(url)
+            # print "%s %s %s" % (netloc, path, url)
             if scheme == 'https':
                 Connection = HTTPSConnection
             else:
@@ -151,7 +152,7 @@ class Feed(object):
             for entry in self.get_children(page, 'entry'):
                 event = self.get_child(entry, 'event')
                 product = self.get_child(event, 'product')
-                data = self.xget_attributes(event)
+                data = self.get_attributes(event)
                 data['product'] = self.get_attributes(product)
                 events.append(data)
             if self.read_forward:
