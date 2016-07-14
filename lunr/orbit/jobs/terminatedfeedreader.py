@@ -25,11 +25,12 @@ import datetime
 
 Base = declarative_base()
 
-## TODO
-#  - write to database
-#  - create classes for tables
-
 log = logger.get_logger('orbit.terminatedfeedreader')
+status_code = 'terminated'
+
+
+class CloudFeedsReadFailed(Exception):
+    pass
 
 
 class Event(Base):
@@ -112,13 +113,19 @@ class Marker(Base):
 
     id = Column(Integer, primary_key=True)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow(), nullable=False)
-    last_marker = Column(String(45), nullable=False)
+    last_marker = Column(String(45), unique=True, nullable=False)
+    marker_timestamp = Column(DateTime, nullable=False)
 
-    def __init__(self, last_marker):
+    def __init__(self, last_marker, timestamp):
         self.last_marker = last_marker
+        self.marker_timestamp = timestamp
 
     def __repr__(self):
         return "<Marker %s: %s >" % (self.last_marker, self.updated_at)
+
+
+def time_parser(timestamp):
+    return datetime.datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S.%fZ')
 
 
 class TerminatedFeedReader(CronJob):
@@ -131,13 +138,14 @@ class TerminatedFeedReader(CronJob):
         self.config = conf
         self._sess = self.database_setup(conf)
 
-    def database_setup(self, conf):
+    @staticmethod
+    def database_setup(conf):
         db_url = conf.string('terminator', 'db_url', 'none')
         db_name = conf.string('terminator', 'db_name', 'terminator')
         url = db_url + db_name
-        engine = create_engine(url, echo=True, pool_recycle=3600)
-        log.debug('Database connection established on %s' % url)
-        # Base.metadata.create_all(engine)
+        # engine = create_engine(url, echo=True, pool_recycle=3600)
+        engine = create_engine(url, pool_recycle=3600)
+        Base.metadata.create_all(engine)
         session = sessionmaker(bind=engine)
         _session = session()
         return _session
@@ -148,8 +156,49 @@ class TerminatedFeedReader(CronJob):
 
         feed_url = self.config.string('terminator', 'feed_url', 'none')
         feed = cloudfeedclient.Feed(self.config, log, None, feed_url, auth_token, read_forward=True)
-        feed_events = feed.get_events()
-        if feed_events is not None:
-            log.debug("Events are being retrieved from %s" % feed_url)
+
+        log_counter = 0
+        marker = self._sess.query(Marker).first()
+
+        last_marker_id = ''
+        last_marker_time = datetime.datetime(1970, 1, 1, 0, 0, 0)
+
+        if marker is not None:
+            last_marker_id = marker.last_marker
+            last_marker_time = marker.marker_timestamp
+            last_run_marker_id = last_marker_id
+            # On marker change, re-fetching the feed
+            feed = cloudfeedclient.Feed(self.config, log, last_marker_id, feed_url, auth_token, read_forward=True)
+
+        try:
+            feed_events = feed.get_events()
+        except CloudFeedsReadFailed:
+            log.debug('Error in retrieving feed from: %s' % feed_url)
+
         for event in feed_events:
-            continue
+            if event['product']['status'].lower() == status_code:
+                timestamp = time_parser(event['eventTime'])
+                event_id = event['id']
+                # print("1. %s > %s, " %(timestamp, last_marker_time) + str(timestamp > last_marker_time))
+                # print("2. %s != %s, " % (event_id, last_marker_id) + str(event_id != last_marker_id))
+                if timestamp >= last_marker_time and event_id != last_marker_id:
+                    # Count of log
+                    log_counter += 1
+                    # Store event log
+                    new_event = Event(timestamp, event_id)
+                    last_marker_id = event_id
+                    last_marker_time = timestamp
+
+                    # Audit the log
+
+                    self._sess.add(new_event)
+
+        # Store the marker
+        if last_run_marker_id != last_marker_id:
+            new_marker = Marker(last_marker_id, last_marker_time)
+            self._sess.add(new_marker)
+
+        log.debug('Events to be terminated in this run: %s' % log_counter)
+
+        self._sess.commit()
+        self._sess.close()
