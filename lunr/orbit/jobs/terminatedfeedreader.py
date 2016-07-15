@@ -177,6 +177,7 @@ class TerminatedFeedReader(CronJob):
 
         last_marker_id = ''
         last_marker_time = datetime.datetime(1970, 1, 1, 0, 0, 0)
+        last_run_marker_id = ''
 
         if marker is not None:
             last_marker_id = marker.last_marker
