@@ -42,16 +42,27 @@ class Event(Base):
 
     id = Column(Integer, primary_key=True, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow())
-    event_id = Column(String(45), unique=True, nullable=False)
+    uuid = Column(String(45), unique=True, nullable=False)
     timestamp = Column(String(25), nullable=False)
 
     def __init__(self, timestamp, event_id):
         self.created_at = datetime.datetime.utcnow()
-        self.event_id = event_id
+        self.uuid = event_id
         self.timestamp = timestamp
 
+    def __init__(self, raw_event):
+        self.created_at = datetime.datetime.utcnow()
+        self.timestamp = time_parser(raw_event['eventTime'])
+        self.uuid = raw_event['id']
+
+    def get_timestamp(self):
+        return self.timestamp
+
+    def get_uuid(self):
+        return self.uuid
+
     def __repr__(self):
-        return "<Event %s: %s %s>" % (self.event_id, self.created_at, self.timestamp)
+        return "<Event %s: %s %s>" % (self.uuid, self.created_at, self.timestamp)
 
 
 class Audit(Base):
@@ -74,6 +85,10 @@ class Audit(Base):
         self.timestamp = kwargs.pop('timestamp')
         self.type = kwargs.pop('type')
         self.created_at = datetime.datetime.utcnow
+
+    def __init__(self, raw_event):
+        self.event_id = raw_event['id']
+        self.tenant_id = raw_event['']
 
     def __repr__(self):
         return "<Audit %s: %s %s %s %s>" % (self.event_id, self.tenant_id, self.timestamp, self.type, self.created_at)
@@ -176,23 +191,31 @@ class TerminatedFeedReader(CronJob):
             log.debug('Error in retrieving feed from: %s' % feed_url)
 
         for event in feed_events:
+            # Audit the log
+            auditor = Audit(event)
+
             if event['product']['status'].lower() == status_code:
-                timestamp = time_parser(event['eventTime'])
-                event_id = event['id']
+                # timestamp = time_parser(event['eventTime'])
+                # event_id = event['id']
+                new_event = Event(event)
+
                 # print("1. %s > %s, " %(timestamp, last_marker_time) + str(timestamp > last_marker_time))
                 # print("2. %s != %s, " % (event_id, last_marker_id) + str(event_id != last_marker_id))
-                if timestamp >= last_marker_time and event_id != last_marker_id:
+                if new_event.get_timestamp() >= last_marker_time and new_event.get_uuid() != last_marker_id:
                     # Count of log
                     log_counter += 1
                     # Store event log
-                    new_event = Event(timestamp, event_id)
-                    last_marker_id = event_id
-                    last_marker_time = timestamp
+                    # new_event = Event(timestamp, event_id)
+                    last_marker_id = new_event.get_uuid()
+                    last_marker_time = new_event.get_timestamp()
 
-                    # Audit the log
+
 
                     self._sess.add(new_event)
 
+                # Catch exceptions and log into error
+
+            self._sess.add(auditor)
         # Store the marker
         if last_run_marker_id != last_marker_id:
             new_marker = Marker(last_marker_id, last_marker_time)
