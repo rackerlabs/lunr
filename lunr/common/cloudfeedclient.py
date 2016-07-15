@@ -17,25 +17,26 @@ from eventlet import timeout
 from httplib import HTTPConnection, HTTPSConnection, urlsplit
 from xml.dom import minidom
 
+class FeedError(Exception):
+    pass
 
-class FeedUnchanged(Exception):
+class FeedUnchanged(FeedError):
     pass
 
 
-class ReachedCurrentPage(Exception):
+class ReachedCurrentPage(FeedError):
     pass
 
 
-class InvalidMarker(Exception):
+class InvalidMarker(FeedError):
     pass
 
 
-class MaxEventsErroring(Exception):
+class MaxEventsErroring(FeedError):
     pass
 
 
-class UnableToGetFeedPage(Exception):
-    pass
+
 
 
 class Feed(object):
@@ -75,6 +76,8 @@ class Feed(object):
                     resp = conn.getresponse()
             except timeout.Timeout:
                 self.logger.info('Timed out getting page')
+            except IOError as e:
+                raise FeedError('GET on %s returned error %s' % (feed_url, e))
             else:
                 if resp.status // 100 == 2:
                     if not self.read_forward:
