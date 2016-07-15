@@ -19,6 +19,7 @@ from lunr.orbit import CronJob
 
 from lunr.common import logger, cloudfeedclient
 from lunr.common.cloudfeedclient import FeedError
+from lunr.cinder.cinderclient import CinderError
 from lunr.cinder import cinderclient
 from sqlalchemy.ext.declarative import declarative_base
 import datetime
@@ -47,15 +48,16 @@ class TerminatedFeedReader(CronJob):
         self.config = conf
         self._sess = session
 
-    def log_error_to_db(self, error, event):
+    def log_error_to_db(self, error, event, e_type):
         event_id = None
         tenant_id = None
         if event is not None:
             event_id = event['id']
             tenant_id = event['tenantId']
-        e_type = "reading"
         new_error = Error(event_id, tenant_id, error=error, type=e_type)
-        self._sess.add(new_error)
+        if not self._sess.query(Error).filter(Error.message == error).first():
+            self._sess.add(new_error)
+        return
 
     def run(self, now=None):
         # closedAccounts = []
@@ -73,59 +75,75 @@ class TerminatedFeedReader(CronJob):
 
         # Get closed accounts
 
-        cinder = cinderclient.CinderClient(**cinderclient.get_args(self.config))
-        auth_token = cinder.token
-
-        feed_url = self.config.string('terminator', 'feed_url', 'none')
-        feed = cloudfeedclient.Feed(self.config, log, None, feed_url, auth_token, read_forward=True)
-
-        log_counter = 0
-        marker = self._sess.query(Marker).first()
-
-        last_marker_id = ''
-        last_marker_time = MIN_TIME
-        last_run_marker_id = ''
-
-        if marker is not None:
-            last_marker_id = marker.last_marker
-            last_marker_time = marker.marker_timestamp
-            last_run_marker_id = last_marker_id
-            # On marker change, re-fetching the feed
-            feed = cloudfeedclient.Feed(self.config, log, last_marker_id, feed_url, auth_token, read_forward=True)
-
         try:
-            feed_events = feed.get_events()
-            for event in feed_events:
-                # Audit the log
-                auditor = Audit(event)
+            cinder = cinderclient.CinderClient(**cinderclient.get_args(self.config))
+            auth_token = cinder.token
 
-                if event['product']['status'].lower() == status_code:
+            # Clear the previous error on successful connection
+            cinder_error = self._sess.query(Error).filter(Error.type == "auth").first()
+            if cinder_error is not None:
+                self._sess.delete(cinder_error)
 
-                    new_event = Event(event)
+            feed_url = self.config.string('terminator', 'feed_url', 'none')
+            feed = cloudfeedclient.Feed(self.config, log, None, feed_url, auth_token, read_forward=True)
 
-                    if new_event.timestamp >= last_marker_time and new_event.uuid != last_marker_id:
-                        # Count of log
-                        log_counter += 1
-                        # Store event log
-                        # new_event = Event(timestamp, event_id)
-                        last_marker_id = new_event.uuid
-                        last_marker_time = new_event.timestamp
+            log_counter = 0
+            marker = self._sess.query(Marker).first()
 
-                        self._sess.add(new_event)
+            last_marker_id = ''
+            last_marker_time = MIN_TIME
+            last_run_marker_id = ''
 
-                        # Catch exceptions and log into error
-                self._sess.add(auditor)
-        except FeedError as e:
-            self.log_error_to_db(e, None)
+            if marker is not None:
+                last_marker_id = marker.last_marker
+                last_marker_time = marker.marker_timestamp
+                last_run_marker_id = last_marker_id
+                # On marker change, re-fetching the feed
+                feed = cloudfeedclient.Feed(self.config, log, last_marker_id, feed_url, auth_token, read_forward=True)
+
+            try:
+                feed_events = feed.get_events()
+
+                # Clear the previous error on successful connection
+                feed_error = self._sess.query(Error).filter(Error.type == "feed").first()
+                if feed_error is not None:
+                    self._sess.delete(feed_error)
+
+                for event in feed_events:
+
+                    if event['product']['status'].lower() == status_code:
+                        new_event = Event(event)
+
+                        if new_event.timestamp >= last_marker_time and new_event.uuid != last_marker_id:
+                            # Count of log
+                            log_counter += 1
+                            # Store event log
+                            # new_event = Event(timestamp, event_id)
+                            last_marker_id = new_event.uuid
+                            last_marker_time = new_event.timestamp
+
+                            self._sess.add(new_event)
+
+                            # Audit the log
+                            auditor = Audit(event)
+                            self._sess.add(auditor)
+
+                            # Catch exceptions and log into error
+            except FeedError as e:
+                self.log_error_to_db(e, None, "feed")
+                log.error(e)
+                # log.debug('Error in retrieving feed from: %s' % feed_url)
+
+            # Store the marker
+            if last_run_marker_id != last_marker_id:
+                new_marker = Marker(last_marker_id, last_marker_time)
+                self._sess.add(new_marker)
+
+            log.debug('Events to be terminated in this run: %s' % log_counter)
+
+        except CinderError as e:
+            self.log_error_to_db(e, None, "auth")
             log.error(e)
-            # log.debug('Error in retrieving feed from: %s' % feed_url)
-
-        # Store the marker
-        if last_run_marker_id != last_marker_id:
-            new_marker = Marker(last_marker_id, last_marker_time)
-            self._sess.add(new_marker)
-
-        log.debug('Events to be terminated in this run: %s' % log_counter)
 
         self._sess.commit()
         self._sess.close()

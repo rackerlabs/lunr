@@ -350,7 +350,7 @@ class Event(ModelBase):
 
     id = Column(Integer, primary_key=True, nullable=False)
     uuid = Column(String(45), unique=True, nullable=False)
-    timestamp = Column(String(25), nullable=False)
+    timestamp = Column(DateTime, nullable=False)
 
     def __init__(self, timestamp, event_id):
         self.uuid = event_id
@@ -376,7 +376,7 @@ class Audit(ModelBase):
     id = Column(Integer, primary_key=True, nullable=False)
     event_id = Column(String(50), index=True, nullable=False)
     tenant_id = Column(String(20), index=True, nullable=False)
-    timestamp = Column(String(25), nullable=False)
+    timestamp = Column(DateTime, nullable=False)
     type = Column(String(15), nullable=False)
 
     def __init__(self, event_id, tenant_id, **kwargs):

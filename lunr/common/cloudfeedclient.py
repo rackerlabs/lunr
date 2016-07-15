@@ -17,8 +17,10 @@ from eventlet import timeout
 from httplib import HTTPConnection, HTTPSConnection, urlsplit
 from xml.dom import minidom
 
+
 class FeedError(Exception):
     pass
+
 
 class FeedUnchanged(FeedError):
     pass
@@ -36,7 +38,8 @@ class MaxEventsErroring(FeedError):
     pass
 
 
-
+class UnableToGetFeedPage(FeedError):
+    pass
 
 
 class Feed(object):
