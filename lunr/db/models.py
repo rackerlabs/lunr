@@ -352,10 +352,6 @@ class Event(ModelBase):
     uuid = Column(String(45), unique=True, nullable=False)
     timestamp = Column(DateTime, nullable=False)
 
-    def __init__(self, timestamp, event_id):
-        self.uuid = event_id
-        self.timestamp = timestamp
-
     def __init__(self, raw_event):
         self.timestamp = time_parser(raw_event['eventTime'])
         self.uuid = raw_event['id']
@@ -379,12 +375,6 @@ class Audit(ModelBase):
     timestamp = Column(DateTime, nullable=False)
     type = Column(String(15), nullable=False)
 
-    def __init__(self, event_id, tenant_id, **kwargs):
-        self.event_id = event_id
-        self.tenant_id = tenant_id
-        self.timestamp = kwargs.pop('timestamp')
-        self.type = kwargs.pop('type')
-
     def __init__(self, raw_event):
         self.event_id = raw_event['id']
         self.tenant_id = raw_event['tenantId']
@@ -392,7 +382,7 @@ class Audit(ModelBase):
         self.type = raw_event['product']['status']
 
     def __repr__(self):
-        return "<Audit %s: %s %s %s >" % (self.event_id, self.tenant_id, self.timestamp, self.type)
+        return "<Audit %s: %s %s %s>" % (self.event_id, self.tenant_id, self.timestamp, self.type)
 
 
 @DateFields
