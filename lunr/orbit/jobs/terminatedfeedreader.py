@@ -85,7 +85,7 @@ class TerminatedFeedReader(CronJob):
                 self._sess.delete(cinder_error)
 
             feed_url = self.config.string('terminator', 'feed_url', 'none')
-            feed = cloudfeedclient.Feed(self.config, log, None, feed_url, auth_token, read_forward=True)
+            feed = cloudfeedclient.Feed(self.config, log, None, feed_url, auth_token)
 
             log_counter = 0
             marker = self._sess.query(Marker).first()
@@ -99,7 +99,7 @@ class TerminatedFeedReader(CronJob):
                 last_marker_time = marker.marker_timestamp
                 last_run_marker_id = last_marker_id
                 # On marker change, re-fetching the feed
-                feed = cloudfeedclient.Feed(self.config, log, last_marker_id, feed_url, auth_token, read_forward=True)
+                feed = cloudfeedclient.Feed(self.config, log, last_marker_id, feed_url, auth_token)
 
             try:
                 feed_events = feed.get_events()

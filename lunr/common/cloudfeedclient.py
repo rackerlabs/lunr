@@ -13,12 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from eventlet import timeout
-from httplib import HTTPConnection, HTTPSConnection, urlsplit
 from xml.dom import minidom
+from urllib2 import Request, urlopen, URLError, HTTPError
+from httplib import HTTPException
+from lunr.common.exc import HTTPClientError, ClientException
+from urllib import urlencode
+import socket
 
 
-class FeedError(Exception):
+class FeedError(ClientException):
     pass
 
 
@@ -26,25 +29,17 @@ class FeedUnchanged(FeedError):
     pass
 
 
-class ReachedCurrentPage(FeedError):
-    pass
-
-
 class InvalidMarker(FeedError):
     pass
 
 
-class MaxEventsErroring(FeedError):
-    pass
-
-
-class UnableToGetFeedPage(FeedError):
+class GetPageFailed(FeedError):
     pass
 
 
 class Feed(object):
-    def __init__(self, conf, logger, etag, feed_url, auth_token,
-                 read_forward=False, last_event=None):
+    def __init__(self, conf, logger, feed_url, auth_token,
+                 etag=None, read_forward=True, last_event=None):
 
         self.logger = logger
         self.feed_url = feed_url
@@ -57,56 +52,48 @@ class Feed(object):
         self.read_forward = read_forward
         self.feed_limit = conf.int('cloudfeedsclient', 'feed_limit', 25)
 
-    def get_connection(self, url):
-        with timeout.Timeout(self.timeout_seconds):
-            scheme, netloc, path, query, fragment = urlsplit(url)
-            # print "%s %s %s" % (netloc, path, url)
-            if scheme == 'https':
-                Connection = HTTPSConnection
-            else:
-                Connection = HTTPConnection
-            return Connection(netloc)
+    def get(self, url, **kwargs):
+        resp = self.request(url, method='GET', **kwargs)
+        if resp.getcode() == 200:
+            return resp.read()
+        return {}
+
+    def request(self, url, method, **kwargs):
+        headers = {'X-Auth-Token': self.auth_token}
+        req = Request(url, data=urlencode(kwargs), headers=headers)
+        req.get_method = lambda *args, **kwargs: method
+
+        try:
+            return urlopen(req, timeout=self.timeout)
+        except (HTTPError, URLError, HTTPException, socket.timeout) as e:
+            raise HTTPClientError(req, e)
 
     def get_page(self, feed_url):
-        try_count = 0
-        while try_count < 5:
-            try_count += 1
-            try:
-                conn = self.get_connection(feed_url)
-                headers = {'x-auth-token': self.auth_token}
-                with timeout.Timeout(self.timeout_seconds):
-                    conn.request('GET', feed_url, '', headers)
-                    resp = conn.getresponse()
-            except timeout.Timeout:
-                self.logger.info('Timed out getting page')
-            except IOError as e:
-                raise FeedError('GET on %s returned error %s' % (feed_url, e))
-            else:
-                if resp.status // 100 == 2:
-                    if not self.read_forward:
-                        self.compare_etag(resp)
-                    content = resp.read()
-                    if content:
-                        return minidom.parseString(content)
-                    else:
-                        self.logger.error('Feed returned an empty page')
-                elif resp.status == 401:
-                    self.logger.error('Feed request returned 401')
-                elif resp.status == 404:
-                    self.logger.error('Feed request returned 404 ' +
-                                      'for marker: %s' % self.last_event)
-                    raise InvalidMarker()
-                else:
-                    self.logger.error(
-                        'Got status %d when trying to read feed' %
-                        resp.status)
-        raise UnableToGetFeedPage()
+        # GET the feed
+        resp = self.get(feed_url)
+        # If returned non 200 class response code
+        if (resp.getcode() / 100) != 2:
+            if resp.getcode() == 404:
+                raise InvalidMarker("GET '%s' returned 404; invalid marker"
+                                    % feed_url)
+            raise GetPageFailed("GET '%s' returned %d when trying to read feed"
+                            % (feed_url, resp.getcode()),
+                            code=resp.getcode())
+
+        # If we asked for read_forward
+        if not self.read_forward:
+            # Compare the etag in the response
+            self.compare_etag(resp)
+
+        # Read and parse the response
+        content = resp.read()
+        if not len(content):
+            raise GetPageFailed("GET '%s' returned an empty page" % feed_url)
+        return minidom.parseString(content)
 
     def compare_etag(self, resp):
         if self.new_etag is None:
-            headers = \
-                dict((h.lower(), v) for h, v in resp.getheaders())
-            self.new_etag = headers.get('etag')
+            self.new_etag = resp.info().getheader('etag')
             if self.new_etag and self.new_etag == self.etag:
                 raise FeedUnchanged()
 
@@ -146,7 +133,8 @@ class Feed(object):
             for c in self.get_children(child, tag_name):
                 yield c
 
-    def get_attributes(self, element):
+    @staticmethod
+    def get_attributes(cls, element):
         data = dict()
         for attr in element.attributes.keys():
             data[attr] = element.getAttribute(attr)
