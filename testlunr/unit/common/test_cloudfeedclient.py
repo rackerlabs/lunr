@@ -12,7 +12,7 @@
 # implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import os
 import unittest
 from lunr.common import cloudfeedclient
 from lunr.common.config import LunrConfig
@@ -46,19 +46,28 @@ class TestBackupSuspects(unittest.TestCase):
     def setUp(self):
         self.conf = LunrConfig()
         self.log = MockLog()
-        self.feed = cloudfeedclient.Feed(self.config, self.log,
+        self.feed = cloudfeedclient.Feed(self.conf, self.log,
                                          "http://no-host.com", "fake-token")
+        self.test_file = os.path.join(os.path.dirname(__file__),
+                                      'test_cloudfeedclient.xml')
 
     def test_get_events_200(self):
-
         def urlopen(request, **kwargs):
-            with open("test_terminatedfeedreader.xml") as fd:
-                return MockResponse(fd.readl())
-                    'in-use': True,
-                    'uri': 'DELETE /volumes/ed209cdd-1317-41e8-8474-b0c0f6c3369c/'
-                           'backups/a30a6e5b-2a96-489c-bde1-56f9c615ea1f',
-                }), 200)
+            with open(self.test_file) as fd:
+                return MockResponse(fd.read(), 200)
 
         with patch(cloudfeedclient, 'urlopen', urlopen):
-                events = self.feed.get_events()
+                events = list(self.feed.get_events())
                 self.assertEquals(len(events), 5)
+                self.assertIn('product', events[0])
+                self.assertIn('tenantId', events[0])
+                self.assertEquals(events[0]['product']['status'], "TERMINATED")
+                self.assertIn("id", events[0])
+
+    def test_get_events_404(self):
+        def urlopen(request, **kwargs):
+            return MockResponse("", 404)
+
+        with patch(cloudfeedclient, 'urlopen', urlopen):
+            with self.assertRaises(cloudfeedclient.InvalidMarker):
+                list(self.feed.get_events())

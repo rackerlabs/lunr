@@ -2,7 +2,6 @@
     <link href="http://localhost:4999/customer_access_policy/events/" rel="current" />
     <link href="http://localhost:4999/customer_access_policy/events/?marker=last&amp;limit=25&amp;direction=forward" rel="self" />
     <id>urn:uuid:f7f77fd8-1bed-484e-bcb2-d57210906f8f</id>
-    <link href="http://localhost:4999/customer_access_policy/events/?marker=urn:uuid:cafb1344-3bb3-4466-8053-6f29f031eec9&amp;limit=25&amp;direction=forward" rel="previous" />
     <title>customer_access_policy/events</title>
     <updated>2016-07-14T20:42:32.092Z</updated>
     <entry>
