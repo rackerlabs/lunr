@@ -71,3 +71,19 @@ class TestBackupSuspects(unittest.TestCase):
         with patch(cloudfeedclient, 'urlopen', urlopen):
             with self.assertRaises(cloudfeedclient.InvalidMarker):
                 list(self.feed.get_events())
+
+    def test_get_events_500(self):
+        def urlopen(request, **kwargs):
+            return MockResponse("", 500)
+
+        with patch(cloudfeedclient, 'urlopen', urlopen):
+            with self.assertRaises(cloudfeedclient.GetPageFailed):
+                list(self.feed.get_events())
+
+    def test_get_events_403(self):
+        def urlopen(request, **kwargs):
+            return MockResponse("", 403)
+
+        with patch(cloudfeedclient, 'urlopen', urlopen):
+            with self.assertRaises(cloudfeedclient.GetPageFailed):
+                list(self.feed.get_events())
