@@ -43,7 +43,7 @@ class Feed(object):
 
         self.logger = logger
         self.feed_url = feed_url
-        self.timeout_seconds = int(conf.string('cloudfeedsclient', 'timeout_seconds', 10))
+        self.timeout = int(conf.string('cloudfeedsclient', 'timeout', 10))
         self.auth_token = auth_token
         self.etag = etag
         self.new_etag = None
@@ -53,10 +53,7 @@ class Feed(object):
         self.feed_limit = conf.int('cloudfeedsclient', 'feed_limit', 25)
 
     def get(self, url, **kwargs):
-        resp = self.request(url, method='GET', **kwargs)
-        if resp.getcode() == 200:
-            return resp.read()
-        return {}
+        return self.request(url, method='GET', **kwargs)
 
     def request(self, url, method, **kwargs):
         headers = {'X-Auth-Token': self.auth_token}
@@ -134,7 +131,7 @@ class Feed(object):
                 yield c
 
     @staticmethod
-    def get_attributes(cls, element):
+    def get_attributes(element):
         data = dict()
         for attr in element.attributes.keys():
             data[attr] = element.getAttribute(attr)
