@@ -533,7 +533,7 @@ class Application(Base):
                 if options.force:
                     # Mark the account as done
                     self.put_done(account)
-            except FailContinue, e:
+            except FailContinue as e:
                 # Log the error and continue to attempt purges
                 LOG.error("Purge for '%s' failed - %s" % (account, e))
 

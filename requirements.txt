@@ -9,7 +9,6 @@ prettytable==0.7.2
 sqlalchemy-migrate==0.8.2
 lz4==0.7.0
 iso8601==0.1.10
-setproctitle==1.0.1
 python-glanceclient==0.11.0
 netaddr==0.7.12
 mock

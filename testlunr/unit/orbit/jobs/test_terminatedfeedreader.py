@@ -14,37 +14,24 @@
 # limitations under the License.
 
 import unittest
+
+from lunr.common.config import LunrConfig
 from lunr.db.models import Error, Audit, Event, Marker
 from lunr.common import cloudfeedclient
 from lunr.cinder import cinderclient
+from lunr import db
+from lunr.orbit.jobs.terminatedfeedreader import TerminatedFeedReader
 
 
-class TestEvent(unittest.TestCase):
+class TestTerminatedFeedReader(unittest.TestCase):
     def setUp(self):
-        self.test_event = \
-            {
-                'dataCenter': 'GLOBAL',
-                'eventTime': '2015-05-05T01:46:00.004Z',
-                'xmlns': 'http://docs.rackspace.com/core/event',
-                'xmlns:ns2': 'http://docs.rackspace.com/event/customer/access_policy',
-                'region': 'GLOBAL',
-                'product': {
-                         'previousEvent': '',
-                         'status': 'SUSPENDED',
-                         'version': '1',
-                         'serviceCode': 'CustomerService'
-                },
-                'tenantId': '6166031',
-                'environment': 'PROD',
-                'version': '2',
-                'type': 'INFO',
-                'id': 'fd1b60a4-d86d-48c1-81ae-8febac824f08'
-             }
+        self.conf = LunrConfig({'db': {'auto_create': True,
+                                       'url': 'sqlite://'}})
+        self.sess = db.configure(self.conf)
 
-    def test_object_creation(self):
-        event = Event(self.test_event)
-        self.assertEqual(event.uuid, 'fd1b60a4-d86d-48c1-81ae-8febac824f08')
-
+    def test_run(self):
+        reader = TerminatedFeedReader(self.conf, self.sess)
+        reader.run()
 
 if __name__ == '__main__':
     unittest.main()
