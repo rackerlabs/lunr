@@ -32,7 +32,15 @@ status_code = 'terminated'
 MIN_TIME = datetime.datetime(1970, 1, 1, 0, 0, 0)
 
 
-class CloudFeedsReadFailed(Exception):
+class CloudFeedsReadFailed(FeedError):
+    pass
+
+
+class EmptyEvent(FeedError):
+    pass
+
+
+class DBError(Exception):
     pass
 
 
@@ -45,109 +53,86 @@ class TerminatedFeedReader(CronJob):
         self.interval = self.parse(conf.string('terminator', 'interval', 'seconds=5'))
         # self.interval = self.parse(conf.string('terminator', 'interval', 'seconds=60'))
         self.timeout = conf.float('orbit', 'timeout', 120)
+        self.url = self.config.string('terminator', 'feed_url', 'none')
         self.config = conf
-        self._sess = session
+        self.session = session
+        self.marker = None
 
-    def log_error_to_db(self, error, event=None, e_type=None):
-        event_id = None
-        tenant_id = None
+    def log_error_to_db(self, error, event=None, e_type="feed"):
+        event_id, tenant_id = None, None
         if event is not None:
             event_id = event['id']
             tenant_id = event['tenantId']
-        new_error = Error(event_id, tenant_id, error=str(error), type=e_type)
-        if not self._sess.query(Error).filter(Error.message == str(error)).first():
-            self._sess.add(new_error)
-        return
+
+        log.error(error)
+        new_error = Error(event_id=event_id, tenant_id=tenant_id,
+                          message=str(error), type=e_type)
+        if not self.session.query(Error).filter(Error.message == str(error)).first():
+            self.session.add(new_error)
 
     def remove_errors(self, e_type=None):
         """ Remove the previous error on successful connection """
         try:
-            cinder_error = self._sess.query(Error).filter(Error.type == e_type).first()
-            if cinder_error is not None:
-                self._sess.delete(cinder_error)
+            error = self.session.query(Error).filter(Error.type == e_type).first()
+            if error is None:
+                return
+            self.session.delete(error)
+            self.session.commit()
         except FeedError as e:
-            log.error(e)
-            self.log_error_to_db(e, e_type)
+            self.log_error_to_db(e, e_type, "feed")
+
+    def fetch_last_marker(self):
+        marker = self.session.query(Marker).first()
+        if marker is None:
+            self.marker = None
+        else:
+            self.marker = marker.last_marker
+
+    def fetch_events(self):
+        # Use cinder client to authenticate
+        cinder = cinderclient.CinderClient(**cinderclient.get_args(self.config))
+        # This will fetch our auth token
+        auth_token = cinder.token
+        # If we had errors on our last run, remove them here
+        self.remove_errors("auth")
+        # Fetch our last marker from the database
+        self.fetch_last_marker()
+        feed = cloudfeedclient.Feed(self.config, log, self.marker, self.url, auth_token)
+        # Fetch all NEW events from the last marker
+        return feed.get_events()
+
+    def save_event(self, event):
+        new_event = Event(
+            event_id=event['uuid'],
+            tenant_id=event['tenantId']
+        )
+        self.session.add(new_event)
+
+    def save_marker(self):
+        self.session.add(Marker(last_marker=self.marker))
 
     def run(self, now=None):
-        # closedAccounts = []
-        # # Get Closed Accounts
-        # accounts = GetClosedAccounts()
-        # for account in accounts:
-        #     # Purge Closed Accounts
-        #     closedAccounts.append(purge(account))
-        #
-        # for closed in closedAccounts:
-        #     markClosed(closed)
-        #
-        # Mark Closed Accounts as done
-        #setup_tables()
-
-        # Get closed accounts
-
+        count = 0
         try:
-            cinder = cinderclient.CinderClient(**cinderclient.get_args(self.config))
-            auth_token = cinder.token
+            # Remove existing errors from db
+            self.remove_errors("feed")
 
-            self.remove_errors("auth")
+            # Read new events from the feed
+            for event in self.fetch_events():
+                count += 1
+                self.save_event(event)
+                if (count % 25) == 0:
+                    self.save_marker()
+                    self.session.commit()
 
-            feed_url = self.config.string('terminator', 'feed_url', 'none')
-            feed = cloudfeedclient.Feed(self.config, log, None, feed_url, auth_token)
-
-            log_counter = 0
-            marker = self._sess.query(Marker).first()
-
-            last_marker_id = ''
-            last_marker_time = MIN_TIME
-            last_run_marker_id = ''
-
-            if marker is not None:
-                last_marker_id = marker.last_marker
-                last_marker_time = marker.marker_timestamp
-                last_run_marker_id = last_marker_id
-                # On marker change, re-fetching the feed
-                feed = cloudfeedclient.Feed(self.config, log, last_marker_id, feed_url, auth_token)
-
-            try:
-                feed_events = feed.get_events()
-
-                self.remove_errors("feed")
-
-                for event in feed_events:
-
-                    if event['product']['status'].lower() == status_code:
-                        new_event = Event(event)
-
-                        if new_event.timestamp >= last_marker_time and new_event.uuid != last_marker_id:
-                            # Count of log
-                            log_counter += 1
-                            # Store event log
-                            # new_event = Event(timestamp, event_id)
-                            last_marker_id = new_event.uuid
-                            last_marker_time = new_event.timestamp
-
-                            self._sess.add(new_event)
-
-                            # Audit the log
-                            auditor = Audit(event)
-                            self._sess.add(auditor)
-
-                            # Catch exceptions and log into error
-            except FeedError as e:
-                self.log_error_to_db(e, None, "feed")
-                log.error(e)
-                # log.debug('Error in retrieving feed from: %s' % feed_url)
-
-            # Store the marker
-            if last_run_marker_id != last_marker_id:
-                new_marker = Marker(last_marker_id, last_marker_time)
-                self._sess.add(new_marker)
-
-            log.debug('Events to be terminated in this run: %s' % log_counter)
+            log.debug("Found '{0}' events to be terminated on this run".format(count))
+            self.session.close()
 
         except CinderError as e:
             self.log_error_to_db(e, None, "auth")
-            log.error(e)
+        except FeedError as e:
+            self.log_error_to_db(e)
+        except DBError as e:
+            log.error("TerminatedFeedReader.run() - %s" % e)
 
-        self._sess.commit()
-        self._sess.close()
+
