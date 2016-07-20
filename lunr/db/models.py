@@ -349,15 +349,8 @@ class Event(ModelBase):
     __immutable_columns__ = ['id']
 
     id = Column(Integer, primary_key=True, nullable=False)
-    uuid = Column(String(45), unique=True, nullable=False)
-    timestamp = Column(DateTime, nullable=False)
-
-    def __init__(self, raw_event):
-        self.timestamp = time_parser(raw_event['eventTime'])
-        self.uuid = raw_event['id']
-
-    def __repr__(self):
-        return "<Event %s: %s>" % (self.uuid, self.timestamp)
+    event_id = Column(String(45), unique=True, nullable=False)
+    tenant_id = Column(String(20), index=True, nullable=False)
 
 
 @DateFields
@@ -372,17 +365,11 @@ class Audit(ModelBase):
     id = Column(Integer, primary_key=True, nullable=False)
     event_id = Column(String(50), index=True, nullable=False)
     tenant_id = Column(String(20), index=True, nullable=False)
-    timestamp = Column(DateTime, nullable=False)
     type = Column(String(15), nullable=False)
 
     def __init__(self, raw_event):
         self.event_id = raw_event['id']
         self.tenant_id = raw_event['tenantId']
-        self.timestamp = raw_event['eventTime']
-        self.type = raw_event['product']['status']
-
-    def __repr__(self):
-        return "<Audit %s: %s %s %s>" % (self.event_id, self.tenant_id, self.timestamp, self.type)
 
 
 @DateFields
@@ -400,11 +387,10 @@ class Error(ModelBase):
     type = Column(String(15), nullable=False)
     message = Column(String(200), unique=True, nullable=False)
 
-    def __init__(self, event_id=None, tenant_id=None, **kwargs):
-        self.event_id = event_id
-        self.tenant_id = tenant_id
-        self.type = kwargs.pop('type')
-        self.message = kwargs.pop('error')
+
+    def __init__(self, **kwargs):
+
+        ModelBase.__init__(self, **kwargs)
 
     def __repr__(self):
         return "<Error %s: %s %s %s>" % (self.event_id, self.tenant_id, self.type, self.message)
