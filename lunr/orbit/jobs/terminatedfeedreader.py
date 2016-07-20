@@ -23,7 +23,7 @@ from lunr.cinder.cinderclient import CinderError
 from lunr.cinder import cinderclient
 from sqlalchemy.ext.declarative import declarative_base
 import datetime
-from lunr.db.models import Audit, Event, Error, Marker, setup_tables
+from lunr.db.models import Audit, Event, Error, Marker
 
 Base = declarative_base()
 
@@ -48,16 +48,26 @@ class TerminatedFeedReader(CronJob):
         self.config = conf
         self._sess = session
 
-    def log_error_to_db(self, error, event, e_type):
+    def log_error_to_db(self, error, event=None, e_type=None):
         event_id = None
         tenant_id = None
         if event is not None:
             event_id = event['id']
             tenant_id = event['tenantId']
-        new_error = Error(event_id, tenant_id, error=error, type=e_type)
-        if not self._sess.query(Error).filter(Error.message == error).first():
+        new_error = Error(event_id, tenant_id, error=str(error), type=e_type)
+        if not self._sess.query(Error).filter(Error.message == str(error)).first():
             self._sess.add(new_error)
         return
+
+    def remove_errors(self, e_type=None):
+        """ Remove the previous error on successful connection """
+        try:
+            cinder_error = self._sess.query(Error).filter(Error.type == e_type).first()
+            if cinder_error is not None:
+                self._sess.delete(cinder_error)
+        except FeedError as e:
+            log.error(e)
+            self.log_error_to_db(e, e_type)
 
     def run(self, now=None):
         # closedAccounts = []
@@ -71,7 +81,7 @@ class TerminatedFeedReader(CronJob):
         #     markClosed(closed)
         #
         # Mark Closed Accounts as done
-        setup_tables()
+        #setup_tables()
 
         # Get closed accounts
 
@@ -79,10 +89,7 @@ class TerminatedFeedReader(CronJob):
             cinder = cinderclient.CinderClient(**cinderclient.get_args(self.config))
             auth_token = cinder.token
 
-            # Clear the previous error on successful connection
-            cinder_error = self._sess.query(Error).filter(Error.type == "auth").first()
-            if cinder_error is not None:
-                self._sess.delete(cinder_error)
+            self.remove_errors("auth")
 
             feed_url = self.config.string('terminator', 'feed_url', 'none')
             feed = cloudfeedclient.Feed(self.config, log, None, feed_url, auth_token)
@@ -104,10 +111,7 @@ class TerminatedFeedReader(CronJob):
             try:
                 feed_events = feed.get_events()
 
-                # Clear the previous error on successful connection
-                feed_error = self._sess.query(Error).filter(Error.type == "feed").first()
-                if feed_error is not None:
-                    self._sess.delete(feed_error)
+                self.remove_errors("feed")
 
                 for event in feed_events:
 

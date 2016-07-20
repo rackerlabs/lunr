@@ -430,11 +430,11 @@ class Marker(ModelBase):
         return "<Marker %s: %s >" % (self.last_marker, self.marker_timestamp)
 
 
-def setup_tables():
-    url = "mysql+mysqldb://root:@192.168.14.4/lunr"
+#def setup_tables():
+#    url = "mysql+mysqldb://root:@192.168.14.4/lunr"
     # engine = create_engine(url, echo=True, pool_recycle=3600)
-    engine = create_engine(url, pool_recycle=3600)
-    ModelBase.metadata.create_all(engine)
+#    engine = create_engine(url, pool_recycle=3600)
+#    ModelBase.metadata.create_all(engine)
 
 if __name__ == "__main__":
     from lunr.db.console import main
