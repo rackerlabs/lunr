@@ -401,9 +401,10 @@ class Marker(ModelBase):
         'mysql_engine': 'InnoDB',
         'mysql_charset': 'utf8',
     })
-    __immutable_columns__ = []
+    __immutable_columns__ = ['id']
 
-    last_marker = Column(String(45), primary_key=True, nullable=False)
+    id = Column(Integer, primary_key=True, nullable=False)
+    last_marker = Column(String(45))
 
     def __init__(self, last_marker):
         self.last_marker = last_marker
