@@ -60,7 +60,7 @@ class TestTerminatedFeedReader(unittest.TestCase):
         self.assertEqual(obj, None)
 
     def test_save_event(self):
-        mock_event = {'id':'123', 'tenantId':'456'}
+        mock_event = {'id': '123', 'tenantId': '456'}
         self.reader.save_event(mock_event)
         self.sess.commit()
         obj = self.sess.query(Event).filter(Event.event_id == mock_event['id']).first()
