@@ -17,11 +17,20 @@ import unittest
 
 from lunr.common.config import LunrConfig
 from lunr.db.models import Error, Event, Marker
-from lunr.cinder import cinderclient
+from lunr.common import cloudfeedclient
 from lunr import db
 from lunr.orbit.jobs.terminatedfeedreader import TerminatedFeedReader
+from testlunr.unit import patch
 
-# Test the cinder client connection
+
+class MockLog(object):
+    msg = ""
+
+    def info(self, msg):
+        self.msg = msg
+
+    def error(self, msg):
+        self.msg = msg
 
 
 class TestTerminatedFeedReader(unittest.TestCase):
@@ -29,9 +38,10 @@ class TestTerminatedFeedReader(unittest.TestCase):
         self.conf = LunrConfig({'db': {'auto_create': True,
                                        'url': 'sqlite://'}})
         self.sess = db.configure(self.conf)
+        self.log = MockLog()
         self.reader = TerminatedFeedReader(self.conf, self.sess)
 
-    #def test_run(self):
+    # def test_run(self):
     #    self.reader.run()
 
     def test_log_to_db_empty_event(self):
@@ -85,9 +95,20 @@ class TestTerminatedFeedReader(unittest.TestCase):
         obj = self.sess.query(Marker).first()
         self.assertIsNotNone(obj)
 
-    # def test_fetch_events(self):
-    #     events = self.reader.fetch_events()
-    #     self.assertIsNotNone(events, "auth/feed retrieval is failing")
+    def test_fetch_events(self):
+        # Mock cinder client request
+        def fetch_token():
+            return 'fake-token'
+
+        # Mock feed server request
+        def fetch_feed():
+            return cloudfeedclient.Feed(self.conf, self.log,
+                                        "http://no-host.com", "fake-token")
+
+        with patch(self.reader, 'fetch_token', fetch_token):
+            with patch(self.reader, 'fetch_feed', fetch_feed):
+                events = self.reader.fetch_events()
+                self.assertIsNotNone(events, "auth/feed retrieval is failing")
 
 if __name__ == '__main__':
     unittest.main()

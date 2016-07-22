@@ -25,22 +25,22 @@ from lunr.db.models import Event, Error, Marker
 console_logger = logger.get_logger('orbit.terminatedfeedreader')
 
 
-class CloudFeedsReadFailed(FeedError):
+class CloudFeedsReadFailed(FeedError):  # pragma: no cover
     pass
 
 
-class EmptyEvent(FeedError):
+class EmptyEvent(FeedError):  # pragma: no cover
     pass
 
 
-class DBError(Exception):
+class DBError(Exception):  # pragma: no cover
     pass
 
 
 class TerminatedFeedReader(CronJob):
     """ Orbit Job to read terminated events from cloud feeds and save them in to the lunr MySQL database. """
 
-    def __init__(self, conf, session):
+    def __init__(self, conf, session):  # pragma: no cover
         CronJob.__init__(self)
         self.span = self.parse(conf.string('terminator', 'span', 'hours=1'))
         # for dev purpose, interval set to 5 sec, but for prod, 1 min
@@ -49,6 +49,7 @@ class TerminatedFeedReader(CronJob):
         self.timeout = conf.float('orbit', 'timeout', 120)
         self.config = conf
         self.url = self.config.string('terminator', 'feed_url', 'none')
+        self.auth_token = None
         self.session = session
         self.marker = None
 
@@ -85,17 +86,25 @@ class TerminatedFeedReader(CronJob):
         else:
             self.marker = marker.last_marker
 
-    def fetch_events(self):
-        """ Authenticate with Identity and fetch new events from cloud feeds """
+    def fetch_token(self):  # pragma: no cover
+        """ Return auth token from keystone, using cinder client """
         # Use cinder client to authenticate
         cinder = cinderclient.CinderClient(**cinderclient.get_args(self.config))
         # This will fetch our auth token
-        auth_token = cinder.token
+        return cinder.token
+
+    def fetch_feed(self):  # pragma: no cover
+        """ Return feed from cloud feeds, using cloud feed client """
+        return cloudfeedclient.Feed(self.config, console_logger, self.marker, self.url, self.auth_token)
+
+    def fetch_events(self):
+        """ Authenticate with Identity and fetch new events from cloud feeds """
+        self.auth_token = self.fetch_token()
         # If we had errors on our last run, remove them here
         self.remove_errors("auth")
         # Fetch our last marker from the database
         self.fetch_last_marker()
-        feed = cloudfeedclient.Feed(self.config, console_logger, self.marker, self.url, auth_token)
+        feed = self.fetch_feed()
         # Fetch all NEW events from the last marker
         return feed.get_events()
 
@@ -105,13 +114,14 @@ class TerminatedFeedReader(CronJob):
             event_id=event['id'],
             tenant_id=event['tenantId']
         )
+        print(new_event.event_id)
         self.session.add(new_event)
 
     def save_marker(self):
         """ Save marker to database """
         self.session.add(Marker(last_marker=self.marker))
 
-    def run(self):
+    def run(self):  # pragma: no cover
         """ Implements the CRON run method """
         count = 0
         try:
