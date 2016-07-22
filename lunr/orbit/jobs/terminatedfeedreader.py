@@ -38,6 +38,7 @@ class DBError(Exception):
 
 
 class TerminatedFeedReader(CronJob):
+    """ Orbit Job to read terminated events from cloud feeds and save them in to the lunr MySQL database. """
 
     def __init__(self, conf, session):
         CronJob.__init__(self)
@@ -101,7 +102,7 @@ class TerminatedFeedReader(CronJob):
     def save_event(self, event):
         """ Save event to database """
         new_event = Event(
-            event_id=event['uuid'],
+            event_id=event['id'],
             tenant_id=event['tenantId']
         )
         self.session.add(new_event)

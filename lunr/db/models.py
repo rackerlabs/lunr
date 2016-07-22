@@ -405,7 +405,7 @@ class Marker(ModelBase):
 
     last_marker = Column(String(45), primary_key=True, nullable=False)
 
-    def __init__(self, last_marker, timestamp):
+    def __init__(self, last_marker):
         self.last_marker = last_marker
 
     def __repr__(self):

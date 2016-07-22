@@ -37,7 +37,7 @@ def request(method, path, headers=None, data=None):
     try:
         resp = urllib2.urlopen(req)
         data = resp.read()
-    except HTTPClientError.exceptions, e:
+    except HTTPClientError.exceptions as e:
         raise CinderError(req, e)
     logger.debug(
         "%s on %s succeeded with %s" %
@@ -62,7 +62,7 @@ class CinderClient(object):
     def request(self, method, path, headers=None, data=None):
         try:
             return request(method, path, headers=headers, data=data)
-        except CinderError, e:
+        except CinderError as e:
             if e.code == 401:
                 if self.retries <= 1:
                     self.retries = RETRIES
