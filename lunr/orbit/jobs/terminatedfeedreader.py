@@ -16,20 +16,13 @@
 from __future__ import print_function
 
 from lunr.orbit import CronJob
-
 from lunr.common import logger, cloudfeedclient
 from lunr.common.cloudfeedclient import FeedError
 from lunr.cinder.cinderclient import CinderError
 from lunr.cinder import cinderclient
-from sqlalchemy.ext.declarative import declarative_base
-import datetime
-from lunr.db.models import Audit, Event, Error, Marker
+from lunr.db.models import Event, Error, Marker
 
-Base = declarative_base()
-
-log = logger.get_logger('orbit.terminatedfeedreader')
-status_code = 'terminated'
-MIN_TIME = datetime.datetime(1970, 1, 1, 0, 0, 0)
+console_logger = logger.get_logger('orbit.terminatedfeedreader')
 
 
 class CloudFeedsReadFailed(FeedError):
@@ -53,22 +46,24 @@ class TerminatedFeedReader(CronJob):
         self.interval = self.parse(conf.string('terminator', 'interval', 'seconds=5'))
         # self.interval = self.parse(conf.string('terminator', 'interval', 'seconds=60'))
         self.timeout = conf.float('orbit', 'timeout', 120)
-        self.url = self.config.string('terminator', 'feed_url', 'none')
         self.config = conf
+        self.url = self.config.string('terminator', 'feed_url', 'none')
         self.session = session
         self.marker = None
 
     def log_error_to_db(self, error, event=None, e_type="feed"):
+        """ Log error/exception to db """
         event_id, tenant_id = None, None
         if event is not None:
-            event_id = event['id']
-            tenant_id = event['tenantId']
+            event_id = event.event_id
+            tenant_id = event.tenant_id
 
-        log.error(error)
+        console_logger.error(error)
         new_error = Error(event_id=event_id, tenant_id=tenant_id,
                           message=str(error), type=e_type)
         if not self.session.query(Error).filter(Error.message == str(error)).first():
             self.session.add(new_error)
+            self.session.commit()
 
     def remove_errors(self, e_type=None):
         """ Remove the previous error on successful connection """
@@ -79,9 +74,10 @@ class TerminatedFeedReader(CronJob):
             self.session.delete(error)
             self.session.commit()
         except FeedError as e:
-            self.log_error_to_db(e, e_type, "feed")
+            self.log_error_to_db(e)
 
     def fetch_last_marker(self):
+        """ Return back the last marker from database (if any) """
         marker = self.session.query(Marker).first()
         if marker is None:
             self.marker = None
@@ -89,6 +85,7 @@ class TerminatedFeedReader(CronJob):
             self.marker = marker.last_marker
 
     def fetch_events(self):
+        """ Authenticate with Identity and fetch new events from cloud feeds """
         # Use cinder client to authenticate
         cinder = cinderclient.CinderClient(**cinderclient.get_args(self.config))
         # This will fetch our auth token
@@ -97,11 +94,12 @@ class TerminatedFeedReader(CronJob):
         self.remove_errors("auth")
         # Fetch our last marker from the database
         self.fetch_last_marker()
-        feed = cloudfeedclient.Feed(self.config, log, self.marker, self.url, auth_token)
+        feed = cloudfeedclient.Feed(self.config, console_logger, self.marker, self.url, auth_token)
         # Fetch all NEW events from the last marker
         return feed.get_events()
 
     def save_event(self, event):
+        """ Save event to database """
         new_event = Event(
             event_id=event['uuid'],
             tenant_id=event['tenantId']
@@ -109,9 +107,11 @@ class TerminatedFeedReader(CronJob):
         self.session.add(new_event)
 
     def save_marker(self):
+        """ Save marker to database """
         self.session.add(Marker(last_marker=self.marker))
 
-    def run(self, now=None):
+    def run(self):
+        """ Implements the CRON run method """
         count = 0
         try:
             # Remove existing errors from db
@@ -121,18 +121,17 @@ class TerminatedFeedReader(CronJob):
             for event in self.fetch_events():
                 count += 1
                 self.save_event(event)
+                # Commit the session after processing 25 events
                 if (count % 25) == 0:
                     self.save_marker()
                     self.session.commit()
 
-            log.debug("Found '{0}' events to be terminated on this run".format(count))
+            console_logger.debug("Found '{0}' events to be saved in DB for this run".format(count))
             self.session.close()
 
         except CinderError as e:
-            self.log_error_to_db(e, None, "auth")
+            self.log_error_to_db(e, e_type="auth")
         except FeedError as e:
             self.log_error_to_db(e)
         except DBError as e:
-            log.error("TerminatedFeedReader.run() - %s" % e)
-
-
+            console_logger.error("TerminatedFeedReader.run() - %s" % e)
