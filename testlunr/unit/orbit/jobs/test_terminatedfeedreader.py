@@ -16,8 +16,7 @@
 import unittest
 
 from lunr.common.config import LunrConfig
-from lunr.db.models import Error, Audit, Event, Marker
-from lunr.common import cloudfeedclient
+from lunr.db.models import Error, Event, Marker
 from lunr.cinder import cinderclient
 from lunr import db
 from lunr.orbit.jobs.terminatedfeedreader import TerminatedFeedReader
@@ -58,15 +57,37 @@ class TestTerminatedFeedReader(unittest.TestCase):
         self.sess.add(mock_error)
         self.reader.remove_errors("test")
         obj = self.sess.query(Error).filter(Error.type == "test").first()
-        self.assertEqual(obj, None, "mock and remove error complete")
+        self.assertEqual(obj, None)
 
     def test_save_event(self):
-        mock_event = {'uuid':'123', 'tenantId':'456'}
+        mock_event = {'id':'123', 'tenantId':'456'}
         self.reader.save_event(mock_event)
         self.sess.commit()
-        obj = self.sess.query(Event).filter(Event.event_id == mock_event['uuid']).first()
-        self.assertEqual(obj.event_id, mock_event['uuid'])
+        obj = self.sess.query(Event).filter(Event.event_id == mock_event['id']).first()
+        self.assertEqual(obj.event_id, mock_event['id'])
         self.assertEqual(obj.tenant_id, mock_event['tenantId'])
+
+    def test_save_marker(self):
+        self.reader.marker = 'test-marker'
+        self.reader.save_marker()
+        self.sess.commit()
+        obj = self.sess.query(Marker).first()
+        self.assertEqual(obj.last_marker, self.reader.marker)
+
+    def test_fetch_last_marker_empty_marker(self):
+        self.reader.fetch_last_marker()
+        self.assertEqual(self.reader.marker, None)
+
+    def test_fetch_last_marker_with_marker(self):
+        mock_marker = Marker(last_marker='test-marker')
+        self.sess.add(mock_marker)
+        self.sess.commit()
+        obj = self.sess.query(Marker).first()
+        self.assertIsNotNone(obj)
+
+    # def test_fetch_events(self):
+    #     events = self.reader.fetch_events()
+    #     self.assertIsNotNone(events, "auth/feed retrieval is failing")
 
 if __name__ == '__main__':
     unittest.main()
