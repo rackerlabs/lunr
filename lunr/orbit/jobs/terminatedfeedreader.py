@@ -114,7 +114,7 @@ class TerminatedFeedReader(CronJob):
             event_id=event['id'],
             tenant_id=event['tenantId']
         )
-        print(new_event.event_id)
+        self.marker = new_event.event_id
         self.session.add(new_event)
 
     def save_marker(self):
@@ -130,14 +130,16 @@ class TerminatedFeedReader(CronJob):
 
             # Read new events from the feed
             for event in self.fetch_events():
+                if event['product']['status'].lower() != 'terminated':
+                    continue
                 count += 1
                 self.save_event(event)
                 # Commit the session after processing 25 events
-                if (count % 25) == 0:
+                if (count % 10) == 0:
                     self.save_marker()
                     self.session.commit()
 
-            console_logger.debug("Found '{0}' events to be saved in DB for this run".format(count))
+            console_logger.debug("Found {0} events to be saved in DB for this run".format(count))
             self.session.close()
 
         except CinderError as e:
