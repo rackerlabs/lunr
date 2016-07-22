@@ -387,9 +387,7 @@ class Error(ModelBase):
     type = Column(String(15), nullable=False)
     message = Column(String(200), unique=True, nullable=False)
 
-
     def __init__(self, **kwargs):
-
         ModelBase.__init__(self, **kwargs)
 
     def __repr__(self):
@@ -406,11 +404,9 @@ class Marker(ModelBase):
     __immutable_columns__ = []
 
     last_marker = Column(String(45), primary_key=True, nullable=False)
-    marker_timestamp = Column(DateTime, nullable=False)
 
     def __init__(self, last_marker, timestamp):
         self.last_marker = last_marker
-        self.marker_timestamp = timestamp
 
     def __repr__(self):
         return "<Marker %s: %s >" % (self.last_marker, self.marker_timestamp)
