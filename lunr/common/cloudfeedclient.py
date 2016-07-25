@@ -152,6 +152,7 @@ class Feed(object):
             if self.read_forward:
                 events.reverse()
             for event in events:
+                self.last_event = event['id']
                 yield event
 
     def get_url(self, page, url_key):
