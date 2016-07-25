@@ -81,10 +81,9 @@ class TerminatedFeedReader(CronJob):
     def fetch_last_marker(self):
         """ Return back the last marker from database (if any) """
         marker = self.session.query(Marker).first()
-        if marker is None:
-            self.marker = None
-        else:
-            self.marker = marker.last_marker
+        if marker:
+            marker = marker.last_marker
+        return marker
 
     def fetch_token(self):  # pragma: no cover
         """ Return auth token from keystone, using cinder client """
@@ -95,7 +94,7 @@ class TerminatedFeedReader(CronJob):
 
     def fetch_feed(self):  # pragma: no cover
         """ Return feed from cloud feeds, using cloud feed client """
-        return cloudfeedclient.Feed(self.config, console_logger, self.marker, self.url, self.auth_token)
+        return cloudfeedclient.Feed(self.config, console_logger, self.url, self.auth_token, last_event=self.marker)
 
     def fetch_events(self):
         """ Authenticate with Identity and fetch new events from cloud feeds """
@@ -103,7 +102,7 @@ class TerminatedFeedReader(CronJob):
         # If we had errors on our last run, remove them here
         self.remove_errors("auth")
         # Fetch our last marker from the database
-        self.fetch_last_marker()
+        self.marker = self.fetch_last_marker()
         feed = self.fetch_feed()
         # Fetch all NEW events from the last marker
         return feed.get_events()
@@ -114,14 +113,19 @@ class TerminatedFeedReader(CronJob):
             event_id=event['id'],
             tenant_id=event['tenantId']
         )
-        self.marker = new_event.event_id
         self.session.add(new_event)
 
     def save_marker(self):
         """ Save marker to database """
-        self.session.add(Marker(last_marker=self.marker))
+        marker = self.session.query(Marker).first()
+        if marker:
+            marker.last_marker = self.marker
+        else:
+            marker = Marker(last_marker=self.marker)
+        self.session.add(marker)
+        self.session.commit()
 
-    def run(self):  # pragma: no cover
+    def run(self): # pragma: no cover
         """ Implements the CRON run method """
         count = 0
         try:
@@ -130,14 +134,21 @@ class TerminatedFeedReader(CronJob):
 
             # Read new events from the feed
             for event in self.fetch_events():
-                if event['product']['status'].lower() != 'terminated':
-                    continue
+                # if event['product']['status'].lower() != 'terminated' or (count % 25 == 1):
+                #     continue
+                print("%s EVENT:%s, TIME:%s, STATUS:%s" % (count, event['id'], event['eventTime'], event['product']['status']))
                 count += 1
-                self.save_event(event)
+                # self.save_event(event)
                 # Commit the session after processing 25 events
-                if (count % 10) == 0:
-                    self.save_marker()
-                    self.session.commit()
+                if (count % 25) == 0:
+                    print("Saved")
+                    # self.session.commit()
+                self.marker = event['id']
+            self.save_marker()
+
+            # # Commit the session and marker at end of run
+            # self.save_marker()
+            # self.session.commit()
 
             console_logger.debug("Found {0} events to be saved in DB for this run".format(count))
             self.session.close()
