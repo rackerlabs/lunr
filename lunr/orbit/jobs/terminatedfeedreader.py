@@ -20,6 +20,7 @@ from lunr.common import logger, cloudfeedclient
 from lunr.common.cloudfeedclient import FeedError
 from lunr.cinder.cinderclient import CinderError
 from lunr.cinder import cinderclient
+import sqlalchemy
 from lunr.db.models import Event, Error, Marker
 
 console_logger = logger.get_logger('orbit.terminatedfeedreader')
@@ -81,8 +82,8 @@ class TerminatedFeedReader(CronJob):
     def fetch_last_marker(self):
         """ Return back the last marker from database (if any) """
         marker = self.session.query(Marker).first()
-        if marker:
-            marker = marker.last_marker
+        if marker is not None:
+            return marker.last_marker
         return marker
 
     def fetch_token(self):  # pragma: no cover
@@ -103,6 +104,7 @@ class TerminatedFeedReader(CronJob):
         self.remove_errors("auth")
         # Fetch our last marker from the database
         self.marker = self.fetch_last_marker()
+        print("Fetching feed with marker: %s" % self.marker)
         feed = self.fetch_feed()
         # Fetch all NEW events from the last marker
         return feed.get_events()
@@ -122,8 +124,8 @@ class TerminatedFeedReader(CronJob):
             marker.last_marker = self.marker
         else:
             marker = Marker(last_marker=self.marker)
+        print("save_marker: %s " % marker.last_marker)
         self.session.add(marker)
-        self.session.commit()
 
     def run(self): # pragma: no cover
         """ Implements the CRON run method """
@@ -134,21 +136,21 @@ class TerminatedFeedReader(CronJob):
 
             # Read new events from the feed
             for event in self.fetch_events():
-                # if event['product']['status'].lower() != 'terminated' or (count % 25 == 1):
+                # if event['product']['status'].lower() != 'terminated':
                 #     continue
                 print("%s EVENT:%s, TIME:%s, STATUS:%s" % (count, event['id'], event['eventTime'], event['product']['status']))
                 count += 1
-                # self.save_event(event)
+                self.save_event(event)
+                self.marker = event['id']
                 # Commit the session after processing 25 events
                 if (count % 25) == 0:
-                    print("Saved")
-                    # self.session.commit()
-                self.marker = event['id']
-            self.save_marker()
+                    # print("Saved at marker %s" % self.marker)
+                    self.save_marker()
+                    self.session.commit()
 
-            # # Commit the session and marker at end of run
-            # self.save_marker()
-            # self.session.commit()
+            # Commit the session and marker at end of run
+            self.save_marker()
+            self.session.commit()
 
             console_logger.debug("Found {0} events to be saved in DB for this run".format(count))
             self.session.close()
@@ -157,5 +159,8 @@ class TerminatedFeedReader(CronJob):
             self.log_error_to_db(e, e_type="auth")
         except FeedError as e:
             self.log_error_to_db(e)
+        except sqlalchemy.exc.DBAPIError as e:
+            console_logger.error("TerminatedFeedReader.run() - %s" % e)
+            self.session.rollback()
         except DBError as e:
             console_logger.error("TerminatedFeedReader.run() - %s" % e)
