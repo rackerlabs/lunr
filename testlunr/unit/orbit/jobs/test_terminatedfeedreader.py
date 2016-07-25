@@ -92,8 +92,8 @@ class TestTerminatedFeedReader(unittest.TestCase):
         mock_marker = Marker(last_marker='test-marker')
         self.sess.add(mock_marker)
         self.sess.commit()
-        obj = self.sess.query(Marker).first()
-        self.assertIsNotNone(obj)
+        self.reader.fetch_last_marker()
+        self.assertIsNotNone(self.reader.marker)
 
     def test_fetch_events(self):
         # Mock cinder client request

@@ -42,7 +42,7 @@ class Feed(object):
                  etag=None, read_forward=True, last_event=None):
 
         self.logger = logger
-        self.feed_url = conf.string('terminator', 'feed_url', 'none')
+        self.feed_url = feed_url or conf.string('terminator', 'feed_url', 'none')
         self.timeout = int(conf.string('cloudfeedsclient', 'timeout', 10))
         self.auth_token = auth_token
         self.etag = etag
@@ -102,7 +102,9 @@ class Feed(object):
                       'direction=forward&limit=%s' % self.feed_limit
             else:
                 url = '%s?marker=last' % (url)
+        print("URL: %s" % url)
         page = self.get_page(url)
+
         while page:
             yield page
 
@@ -112,6 +114,8 @@ class Feed(object):
                 url = self.get_url(page, 'next')
 
             if url:
+                print("Last event: %s" % self.last_event)
+                print("URL: %s" % url)
                 page = self.get_page(url)
             else:
                 page = None
