@@ -92,7 +92,7 @@ class TestTerminatedFeedReader(unittest.TestCase):
         mock_marker = Marker(last_marker='test-marker')
         self.sess.add(mock_marker)
         self.sess.commit()
-        self.reader.fetch_last_marker()
+        self.reader.marker = self.reader.fetch_last_marker()
         self.assertIsNotNone(self.reader.marker)
 
     def test_fetch_events(self):

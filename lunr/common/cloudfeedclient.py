@@ -102,7 +102,6 @@ class Feed(object):
                       'direction=forward&limit=%s' % self.feed_limit
             else:
                 url = '%s?marker=last' % (url)
-        print("URL: %s" % url)
         page = self.get_page(url)
 
         while page:
@@ -114,8 +113,6 @@ class Feed(object):
                 url = self.get_url(page, 'next')
 
             if url:
-                print("Last event: %s" % self.last_event)
-                print("URL: %s" % url)
                 page = self.get_page(url)
             else:
                 page = None
