@@ -1,6 +1,6 @@
 # Copyright (c) 2011-2016 Rackspace US, Inc.
 #
-# Licensed under the Apache License, Version 2.0 (the "License")
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
@@ -15,13 +15,16 @@
 
 from __future__ import print_function
 
-from cinderclient.exceptions import NotFound, ClientException, BadRequest
+from lunr.orbit import CronJob
+from lunr.common import logger
+from lunr.cinder import cinderclient
+import sqlalchemy.exc
+from lunr.db.models import Event, Audit, Error, Marker
+from lunr.cinder.cinderclient.exceptions import NotFound, ClientException, BadRequest
 import lunrclient
 from lunrclient import LunrClient, CinderClient, StorageClient
 from requests.exceptions import RequestException
 from lunrclient import LunrError, LunrHttpError
-from logging.handlers import SysLogHandler
-from argparse import ArgumentParser
 from os import path
 
 import requests
@@ -30,126 +33,18 @@ import time
 import sys
 import os
 
-lof = logging.getLogger("purge-accounts")
-
-"""
-class KeyValueParser(dict):
-
-    def __init__(self):
-        self.name = None
-
-    def get_or_env(self, key):
-        return self.__dict__.get(key) or os.environ.get(key, '')
-
-    def __getitem__(self, index):
-        return self.get(index)
-
-    def missing(self, keys):
-        # Given a list of keys that should exist in the config, return a list
-        # of keys that are missing
-        return [key for key in keys if self.get(key) is None]
-
-    def readfp(self, fd):
-        # Save the name of the file
-        self.name = fd.name
-        for line in fd:
-            try:
-                # Ignore comment lines
-                if line.startswith('#'):
-                    continue
-                # Split key=value
-                (key, value) = line.rstrip().split('=')
-                # Remove inline comments
-                index = value.find('#')
-                if index != -1:
-                    value = value[0:index]
-                # trim whitespace
-                value = value.strip()
-                # Remove single and double quotes
-                value = re.sub(r'^("|\')|("|\')$', '', value)
-                self[key.strip()] = value
-            except ValueError:
-                # Ignore lines with no '='
-                continue
-"""
-"""
-def setup_logging(verbose):
-    # Setup logger to log to syslog and optionally be more verbose to stdout if
-    # asked by user
-
-    syslog = SysLogHandler('/dev/log', SysLogHandler.LOG_LOCAL5)
-    streamformat = "%(module)s:%(levelname)s %(message)s"
-    syslog.setFormatter(logging.Formatter(streamformat))
-    LOG.addHandler(syslog)
-    LOG.setLevel(logging.DEBUG)
-
-    # Setup log to stdout for pruge-accounts.py
-    stream = logging.StreamHandler()
-    stream.setFormatter(logging.Formatter("-- %(message)s"))
-    LOG.addHandler(stream)
-    LOG.setLevel(logging.ERROR)
-    if verbose == 1:
-        LOG.setLevel(logging.INFO)
-    if verbose > 1:
-        LOG.setLevel(logging.DEBUG)
-
-    # Add syslog handlers for cinderclient and keystone
-    cinder = logging.getLogger("cinderclient.client")
-    cinder.addHandler(syslog)
-    keystone = logging.getLogger("keystoneclient")
-    keystone.addHandler(syslog)
-"""
-
-class Fail(Exception):
-    pass
-
-
-class FailContinue(Exception):
-    pass
-
-"""
-class Base:
-
-    def __init__(self):
-        self.total = {
-            'backups': 0,
-            'backup-size': 0,
-            'volumes': 0,
-            'vtypes': {}
-        }
-        self.cursor = '/-\|'
-        self.cursor_pos = 0
-
-    def report(self, totals):
-        return "%s Volumes ( %s ) and %s Backups ( %sGB ) " % (
-            totals['volumes'],
-            ', '.join(["%s: %sGB" % (key, totals['vtypes'][key])
-                       for key in totals['vtypes'].keys()]),
-            totals['backups'],
-            totals['backup-size']
-        )
-
-    def spin_cursor(self):
-        if self.cursor is None:
-            return
-        self.cursor_pos = (self.cursor_pos + 1) % len(self.cursor)
-        sys.stdout.write(self.cursor[self.cursor_pos])
-        sys.stdout.flush()
-        time.sleep(0.1)
-        sys.stdout.write('\b')
-"""
+log = logger.get_logger('orbit.purgeaccounts')
 
 
 class Purge:
 
     def __init__(self, tenant_id, creds, options):
-        # Base.__init__(self)
         self.lunr = LunrClient(tenant_id, timeout=10, url=creds['lunr_url'],
                                http_agent='cbs-purge-accounts',
                                debug=(options.verbose > 1))
         self.cinder = CinderClient(timeout=10, http_agent='cbs-purge-accounts',
                                    creds=creds, debug=(options.verbose > 1),
-                                   logger=LOG)
+                                   logger=log)
         self.throttle = options.throttle
         self.verbose = options.verbose
         self.tenant_id = str(tenant_id)
@@ -160,11 +55,11 @@ class Purge:
             self.cursor = None
 
     def log(self, msg):
-        LOG.info("DDI: %s (%s) - %s" % (self.tenant_id, self.region, msg))
+        log.info("DDI: %s (%s) - %s" % (self.tenant_id, self.region, msg))
 
     def debug(self, msg):
         if self.verbose:
-            LOG.debug("DDI: %s (%s) - %s" % (self.tenant_id, self.region, msg))
+            log.debug("DDI: %s (%s) - %s" % (self.tenant_id, self.region, msg))
         else:
             self.spin_cursor()
 
@@ -381,168 +276,40 @@ class Purge:
             self.cinder.quotas.update(tenant_id, **updates)
 
 
-# noinspection PyPackageRequirements
-class Application:
+class PurgeAccounts(CronJob):
 
-    def __init__(self):
-        # Base.__init__(self)
-        self.verbose = False
+    def __init__(self, conf, session):
+        CronJob.__init__(self)
+        self.config = conf
+        self.session = session
+        self.span = self.parse(conf.string('terminator', 'span', 'hours=1'))
+        self.interval = self.parse(conf.string('terminator', 'interval', 'seconds=5'))
+        self.timeout = conf.float('orbit', 'timeout', 120)
 
-    # the way to register the application has changed to cloud feeds
-    # def register(self, url, region):
-    #     app_id = 'cbs-purge-accounts-%s' % region
-    #     resp = requests.get('/'.join([url, 'register', app_id]), timeout=10)
-    #     print("PURGE_ACCOUNTS_URL=%s" % url)
-    #     print("PURGE_ACCOUNTS_KEY=%s" % resp.text)
-    #     print("PURGE_ACCOUNTS_APP_ID=%s" % app_id)
-    #     return 0
+    def run(self):
+        log.info("purge accounts job is online")
 
-    def read_config(self, files):
-        """ Given a list of config files, attempt to load each file.
-        Return the config for the first valid file we find """
-        def open_fd(file):
-            try:
-                return open(file)
-            except IOError:
-                return None
-
-        if not any([os.path.exists(rc) for rc in files]):
-            raise Fail("Couldn't find any of these config files to load [%s]" %
-                       ",".join(files))
-
-        # Read the first file we find
-        conf = KeyValueParser()
-        for fd in [open_fd(file) for file in files]:
-            if fd is None:
-                continue
-            conf.readfp(fd)
-            return conf
-
-    def load_config(self):
-        config = self.read_config([path.expanduser('~/.environment'),
-                                  '/home/lunr/.environment'])
-
-        # Report if any of these config options are missing
-        missing = config.missing(['PURGE_ACCOUNTS_URL', 'PURGE_ACCOUNTS_KEY',
-                                  'PURGE_ACCOUNTS_APP_ID', 'OS_AUTH_URL',
-                                  'LUNR_API_URL', 'OS_TENANT_NAME',
-                                  'OS_PASSWORD', 'OS_USERNAME', 'OS_REGION'])
-        if missing:
-            print("-- The variable(s) [%s] are missing from config"
-                  " file '%s'" % (','.join(missing), config.name))
-            # needs to be revamped with cloud feeds
-            if config.missing(['PURGE_ACCOUNTS_URL', 'PURGE_ACCOUNTS_KEY',
-                               'PURGE_ACCOUNTS_APP_ID']):
-                print("-- You must register the purge-accounts.py with "
-                      "the account feed")
-                print("-- ./purge-accounts.py <REGION> --register "
-                      "http://api.actioneer.ohthree.com\n")
-            return False
-
-        # Closed Accounts Config
-        self.url = config.get('PURGE_ACCOUNTS_URL')
-        self.key = config.get('PURGE_ACCOUNTS_KEY')
-        self.app_id = config.get('PURGE_ACCOUNTS_APP_ID')
-
-        # Cinder and Lunr Client Credentials
-        self.creds = {
-            'auth_url': config.get('OS_AUTH_URL'),
-            'lunr_url': config.get('LUNR_API_URL'),
-            'tenant_name': config.get('OS_TENANT_NAME'),
-            'username': config.get('OS_USERNAME'),
-            'password': config.get('OS_PASSWORD'),
-            'region': config.get('OS_REGION')
-        }
-
-        return True
-
-    def purge_quotas(self, options):
-        tenants = options.quotas.split(',')
-        if not len(tenants):
-            print("-- quotas option must provide a comma delimited list of"
-                  "tenant_ids (see --help)")
-            return 1
-
-        for tenant_id in tenants:
-            try:
-                LOG.info("Checking quotas for '%s'" % tenant_id)
-                purger = Purge(tenant_id, self.creds, options)
-                purger.delete_quotas(tenant_id)
-            except ClientException, e:
-                LOG.error(e)
-
-        return 0
-
-    def run(self, argv):
-        # p = ArgumentParser(description="Purges closed accounts from cinder")
-        # p.add_argument('--register', metavar='URL',
-        #                help="Register the purge script with the account feed")
-        # p.add_argument('--force', '-f', action='store_true',
-        #                help="Do the actual purge, instead of just reporting")
-        # p.add_argument('--region', metavar='REGION',
-        #                help="Specify a region to register for")
-        # p.add_argument('--throttle', '-t', default=0, type=float,
-        #                metavar='INT',
-        #                help="Seconds to wait between actions taken")
-        # p.add_argument('--verbose', '-v', action='count', default=0,
-        #                help="-v logs info() to stdout, -vv logs "
-        #                "debugs to stdout")
-        # p.add_argument('--cursor', '-c', action='store_true',
-        #                help="Enable the spinning cursor")
-        # p.add_argument('--quotas', '-q',
-        #                help="Purge quotas from the list of provided "
-        #                "tenant_id's example: [ --quotas 23423,52356,56232 ]")
-        # p.add_argument('--account', '-a', help="Purge only this one account")
-        # options = p.parse_args(argv)
-        # self.verbose = options.verbose
-        #
-        # # Setup Logging
-        # setup_logging(options.verbose)
-
-        # If option is set to register, the method is called
-        # if options.register:
-        #     if not options.region:
-        #         print("-- You must include --region when using --register")
-        #         return 1
-        #     return self.register(options.register, options.region)
-        #
-        # # Attempt to load our config
-        # if not self.load_config():
-        #     return 1
-        #
-        # if options.quotas:
-        #     return self.purge_quotas(options)
-        #
-        # if not options.cursor:
-        #     self.cursor = None
-        #
-        # if options.account:
-        #     # Only purge this one account
-        #     self.run_purge(options.account, options)
-        #     self.print_totals()
-        #     return
-
-        # Make a call to the closed account feed
         accounts = self.fetch_accounts()
-        LOG.info("Feed returned '%d' tenant_id's to close" % len(accounts))
+        log.info("Feed returned '%d' tenant_id's to close" % len(accounts))
+        throttle = 10
 
         # Iterate over the list of deletable accounts
         for account in accounts:
             try:
-                self.run_purge(account, options)
-                time.sleep(options.throttle)
+                self.run_purge(account)
+                time.sleep(throttle)
                 if options.force:
                     # Mark the account as done
                     self.put_done(account)
             except FailContinue as e:
                 # Log the error and continue to attempt purges
-                LOG.error("Purge for '%s' failed - %s" % (account, e))
+                log.error("Purge for '%s' failed - %s" % (account, e))
 
         # Print out the purge totals
         self.print_totals()
 
     def print_totals(self):
-        LOG.info("Grand Total - %s " % self.report(self.total))
+        log.info("Grand Total - %s " % self.report(self.total))
 
     def collect_totals(self, purger):
         self.total['volumes'] += purger.total['volumes']
@@ -559,7 +326,7 @@ class Application:
         purger = None
 
         try:
-            LOG.debug("Tenant ID: %s" % tenant_id)
+            log.debug("Tenant ID: %s" % tenant_id)
             purger = Purge(tenant_id, self.creds, options)
             if purger.purge():
                 # If we found something for this tenant
@@ -571,17 +338,17 @@ class Application:
             raise
 
         if not found and options.verbose:
-            LOG.info("No Volumes or Backups to purge for '%s'" % tenant_id)
+            log.info("No Volumes or Backups to purge for '%s'" % tenant_id)
             return True
 
         if options.force:
             if options.verbose or found:
-                LOG.info("Purge of '%s' Completed Successfully" % tenant_id)
+                log.info("Purge of '%s' Completed Successfully" % tenant_id)
         return True
 
     def fetch_accounts(self):
         url = '/'.join([self.url, 'ready', self.app_id])
-        LOG.info("Fetching Tenant ID's from feed (%s)" % url)
+        log.info("Fetching Tenant ID's from feed (%s)" % url)
         resp = requests.get(url, headers={'X-Auth-Token': self.key},
                             timeout=10)
         if resp.status_code == 401:
@@ -592,48 +359,7 @@ class Application:
 
     def put_done(self, account):
         url = '/'.join([self.url, 'done', self.app_id, str(account)])
-        LOG.debug("Marking Tenant ID '%s' as DONE (%s)" % (account, url))
+        log.debug("Marking Tenant ID '%s' as DONE (%s)" % (account, url))
         resp = requests.get(url, headers={'X-Auth-Token': self.key},
                             timeout=10)
         resp.raise_for_status()
-
-
-if __name__ == "__main__":
-    """
-        In order for purge-accounts.py to track which accounts have already
-        been purged it must first be registered with the closed accounts
-        feed, like so
-
-        ./purge-accounts.py --region <REGION> --register
-
-        This will print the registration id, feed url and the application id
-        fetched from the closed accounts api. Since this script is run
-        independently in each DC, the application id includes the <REGION>
-        passed, which makes the registration id unique for each REGION.
-
-        You must write the output from the --register command into either
-        /home/lunr/.environment or ~/.environment file.
-
-        Once the registered values have been written to the .environment file
-        we can run an account purge report. This will report what volumes and
-        backups are still available for the accounts in the feed, use
-        --verbose for a very detailed explanation of what purge-accounts.py
-        is doing.
-
-        ./purge-accounts.py --verbose
-
-        Once satisfied with the report, you can purge the accounts with
-        --force argument
-
-        ./purge-accounts.py --force
-
-    """
-
-    try:
-        app = Application()
-        sys.exit(app.run(sys.argv[1:]))
-    except (RequestException, Fail) as e:
-        LOG.error("%s" % str(e))
-        LOG.error("Stopped")
-        app.print_totals()
-        sys.exit(1)
