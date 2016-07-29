@@ -14,3 +14,4 @@ netaddr==0.7.12
 mock
 coverage
 nose
+python-lunrclient

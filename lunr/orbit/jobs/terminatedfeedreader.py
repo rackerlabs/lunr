@@ -125,7 +125,7 @@ class TerminatedFeedReader(CronJob):
             marker = Marker(last_marker=self.marker)
         self.session.add(marker)
 
-    def run(self): # pragma: no cover
+    def run(self):  # pragma: no cover
         """ Implements the CRON run method """
         count = 0
         try:
