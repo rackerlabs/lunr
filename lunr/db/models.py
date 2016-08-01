@@ -367,10 +367,6 @@ class Audit(ModelBase):
     tenant_id = Column(String(20), index=True, nullable=False)
     type = Column(String(15), nullable=False)
 
-    def __init__(self, raw_event):
-        self.event_id = raw_event['id']
-        self.tenant_id = raw_event['tenantId']
-
 
 @DateFields
 class Error(ModelBase):
