@@ -17,21 +17,18 @@ from __future__ import print_function
 
 from lunr.orbit import CronJob
 from lunr.common import logger
-from lunr.cinder import cinderclient
-# import sqlalchemy.exc
-from lunr.db.models import Event, Audit, Error, Marker
-# from lunr.cinder.cinderclient import NotFound, ClientException, BadRequest
+from lunr.db.models import Event, Audit, Error
 
 import time
 
 log = logger.get_logger('orbit.purgeaccounts')
 
 
-class PurgeEror(Exception):
+class PurgeError(Exception):
     pass
 
 
-class FailContinue(PurgeEror):
+class FailContinue(PurgeError):
     pass
 
 
@@ -45,25 +42,53 @@ class PurgeAccounts(CronJob):
         self.interval = self.parse(conf.string('terminator', 'interval', 'seconds=5'))
         self.timeout = conf.float('orbit', 'timeout', 120)
         self.total = 0
+        self.options = {'throttle': 1, 'verbose': True}
+
+    def log_error_to_db(self, error, event=None, e_type="processing"):
+        """ Log error/exception to db """
+        event_id, tenant_id = None, None
+        if event is not None:
+            event_id = event.event_id
+            tenant_id = event.tenant_id
+
+        new_error = Error(event_id=event_id, tenant_id=tenant_id,
+                          message=str(error), type=e_type)
+        if not self.session.query(Error).filter(Error.message == str(error)).first():
+            self.session.add(new_error)
+            self.session.commit()
+
+    def remove_errors(self, event=None, e_type=None):
+        """ Remove the previous error on successful connection """
+        try:
+            error = self.session.query(Error).\
+                filter(Error.type == e_type).\
+                filter(Error.event_id == event.event_id).\
+                first()
+            if error is None:
+                return
+            self.session.delete(error)
+            self.session.commit()
+        except PurgeError as e:
+            self.log_error_to_db(e)
 
     def run(self):
         log.info("purge accounts job is online")
 
         # accounts = self.fetch_accounts()
         # log.info("Feed returned '%d' tenant_id's to close" % len(accounts))
-        throttle = 10
 
         # Iterate over the list of deletable accounts
-        for account in self.fetch_accounts():
+        for event in self.fetch_events():
             try:
-                tenant = account.tenant_id
-                self.run_purge(tenant)
-                time.sleep(throttle)
+                account = event.tenant_id
+                self.run_purge(account)
+                time.sleep(self.options['throttle'])
                 # Mark the account as done
-                self.put_done(account)
-            except PurgeEror as e:
+                self.save_to_audit(event)
+            except PurgeError as e:
                 # Log the error and continue to attempt purges
-                log.error("Purge for '%s' failed - %s" % (tenant, e))
+                log.error("Purge for %s failed on event %s - %s" % (event.tenant_id, event.event_id, e))
+                self.log_error_to_db(e, event)
 
         # Print out the purge totals
         self.print_totals()
@@ -88,44 +113,30 @@ class PurgeAccounts(CronJob):
         try:
             log.debug("Tenant ID: %s" % tenant_id)
             # purger = Purge(tenant_id, self.config, options)
-            if purger.purge():
-                # If we found something for this tenant
-                self.collect_totals(purger)
-                found = True
+            # if purger.purge():
+            #     # If we found something for this tenant
+            #     self.collect_totals(purger)
+            #     found = True
 
         except FailContinue:
             self.collect_totals(purger)
             raise
 
-        if not found:
+        if not found and self.options['verbose']:
             log.info("No Volumes or Backups to purge for '%s'" % tenant_id)
             return True
-        if found:
+        if found or self.options['verbose']:
             log.info("Purge of '%s' Completed Successfully" % tenant_id)
         return True
 
-    def fetch_accounts(self):
+    def fetch_events(self):
         events = self.session.query(Event).limit(100)
         return events
 
-        # url = '/'.join([self.url, 'ready', self.app_id])
-        # log.info("Fetching Tenant ID's from feed (%s)" % url)
-        # resp = requests.get(url, headers={'X-Auth-Token': self.key},
-        #                     timeout=10)
-        # if resp.status_code == 401:
-        #     raise Fail("Feed '%s' returned 401 UnAuthorized, use --register"
-        #                "to re-register" % url)
-        # resp.raise_for_status()
-        # return resp.json()
-
-    def put_done(self, event):
+    def save_to_audit(self, event):
         record = Audit(event_id=event.event_id, tenant_id=event.tenant_id, type='TERMINATED')
         self.session.add(record)
         # Delete the processed event from queue
         self.session.delete(event)
         self.session.commit()
-        # url = '/'.join([self.url, 'done', self.app_id, str(account)])
-        # log.debug("Marking Tenant ID '%s' as DONE (%s)" % (account, url))
-        # resp = requests.get(url, headers={'X-Auth-Token': self.key},
-        #                     timeout=10)
-        # resp.raise_for_status()
+

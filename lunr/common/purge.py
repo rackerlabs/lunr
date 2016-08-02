@@ -14,14 +14,18 @@
 # limitations under the License.
 
 import lunrclient
-from lunrclient import LunrClient, CinderClient, StorageClient
+from lunrclient.client import LunrClient, CinderClient, StorageClient
 # from lunrclient import LunrError, LunrHttpError
+from lunr.cinder.cinderclient import NotFound, ClientException, BadRequest
 
 
 class Purge:
 
     def __init__(self, tenant_id, conf, options):
-        lunr_url = self.parse(conf.string('terminator', 'span', 'hours=1'))
+        self.creds = {
+
+            'lunr_url' : self.parse(conf.string('terminator', 'span', 'hours=1'))
+        }l
         self.lunr = LunrClient(tenant_id, timeout=10, url=lunr_url,
                                http_agent='cbs-purge-accounts',
                                debug=(options.verbose > 1))

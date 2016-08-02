@@ -481,12 +481,12 @@ class Application:
         #                help="Do the actual purge, instead of just reporting")
         # p.add_argument('--region', metavar='REGION',
         #                help="Specify a region to register for")
-        # p.add_argument('--throttle', '-t', default=0, type=float,
-        #                metavar='INT',
-        #                help="Seconds to wait between actions taken")
-        # p.add_argument('--verbose', '-v', action='count', default=0,
-        #                help="-v logs info() to stdout, -vv logs "
-        #                "debugs to stdout")
+        p.add_argument('--throttle', '-t', default=0, type=float,
+                       metavar='INT',
+                       help="Seconds to wait between actions taken")
+        p.add_argument('--verbose', '-v', action='count', default=0,
+                       help="-v logs info() to stdout, -vv logs "
+                       "debugs to stdout")
         # p.add_argument('--cursor', '-c', action='store_true',
         #                help="Enable the spinning cursor")
         # p.add_argument('--quotas', '-q',
