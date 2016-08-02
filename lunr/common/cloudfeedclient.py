@@ -39,7 +39,7 @@ class GetPageFailed(FeedError):
 
 class Feed(object):
     def __init__(self, conf, logger, feed_url, auth_token,
-                 etag=None, read_forward=True, last_event=None):
+                 etag=None, read_forward=True, last_event=None, limit=50):
 
         self.logger = logger
         self.feed_url = feed_url or conf.string('terminator', 'feed_url', 'none')
@@ -51,6 +51,7 @@ class Feed(object):
         self.last_event = last_event
         self.read_forward = read_forward
         self.feed_limit = conf.int('cloudfeedsclient', 'feed_limit', 25)
+        self.event_limit = limit
 
     def get(self, url, **kwargs):
         return self.request(url, method='GET', **kwargs)
@@ -138,6 +139,7 @@ class Feed(object):
         return data
 
     def get_events(self):
+        event_count = 0
         for page in self.get_pages():
             events = list()
             for entry in self.get_children(page, 'entry'):
@@ -150,6 +152,10 @@ class Feed(object):
                 events.reverse()
             for event in events:
                 self.last_event = event['id']
+                event_count += 1
+                # Rate limits to set number of events
+                if event_count > self.event_limit:
+                    return
                 yield event
 
     def get_url(self, page, url_key):
