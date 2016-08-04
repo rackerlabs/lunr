@@ -14,27 +14,36 @@
 # limitations under the License.
 
 import lunrclient
-from lunrclient.client import LunrClient, CinderClient, StorageClient
+from lunrclient.client import LunrClient, StorageClient
+from lunr.cinder import cinderclient
 # from lunrclient import LunrError, LunrHttpError
 from lunr.cinder.cinderclient import NotFound, ClientException, BadRequest
+from lunr.common import logger
+import time
+
+log = logger.get_logger('orbit.purge')
+
+
+class PurgeError(Exception):
+    pass
+
+
+class FailContinue(PurgeError):
+    pass
 
 
 class Purge:
 
     def __init__(self, tenant_id, conf, options):
         self.creds = {
-
-            'lunr_url' : self.parse(conf.string('terminator', 'span', 'hours=1'))
-        }l
-        self.lunr = LunrClient(tenant_id, timeout=10, url=lunr_url,
+            'lunr_url': self.parse(conf.string('terminator', 'span', 'hours=1'))
+        }
+        self.lunr = LunrClient(tenant_id, timeout=10, url=self.creds['lunr_url'],
                                http_agent='cbs-purge-accounts',
                                debug=(options.verbose > 1))
-        self.cinder = CinderClient(timeout=10, http_agent='cbs-purge-accounts',
-                                   creds=conf, debug=(options.verbose > 1),
-                                   logger=log)
+        self.cinder = cinderclient.CinderClient(**cinderclient.get_args(self.config))
         self.tenant_id = str(tenant_id)
         self.region = self.parse(conf.string('terminator', 'region', 'none'))
-        # self.report_only = not options.force
         self.config = conf
 
 #     def log(self, msg):
@@ -46,6 +55,7 @@ class Purge:
 #         else:
 #             self.spin_cursor()
 #
+    @staticmethod
     def wait_on_status(self, func, status):
         for i in range(20):
             resp = func()
@@ -57,14 +67,9 @@ class Purge:
     def delete_backup(self, backup):
         # Skip backups already in a deleting status
         if backup['status'] in ('DELETING', 'DELETED'):
-            self.debug("SKIP - Backup %s in status of %s"
+            log.debug("SKIP - Backup %s in status of %s"
                        % (backup['id'], backup['status']))
             return False
-
-        if self.report_only:
-            self.log("Found snapshot '%s' in status '%s'"
-                     % (backup['id'], backup['status']))
-            return True
 
         # Catch statuses we may have missed
         if backup['status'] != 'AVAILABLE':
@@ -72,11 +77,11 @@ class Purge:
                                % (backup['id'], backup['status']))
 
         try:
-            self.log("Attempting to delete snapshot %s in status %s"
+            log.debug("Attempting to delete snapshot %s in status %s"
                      % (backup['id'], backup['status']))
             self.cinder.volume_snapshots.delete(str(backup['id']))
         except NotFound:
-            self.log("WARNING - Snapshot already deleted - Cinder returned "
+            log.debug("WARNING - Snapshot already deleted - Cinder returned "
                      "404 on delete call %s" % backup['id'])
             return True
 
@@ -88,7 +93,7 @@ class Purge:
             raise FailContinue("Snapshot '%s' never changed to status of "
                                "'deleted'" % backup['id'])
         except NotFound:
-            self.log("Delete %s Success" % backup['id'])
+            log.debug("Delete %s Success" % backup['id'])
             return True
 
     def is_volume_connected(self, volume):
