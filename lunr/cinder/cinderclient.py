@@ -49,12 +49,13 @@ def request(method, path, headers=None, data=None):
 class CinderClient(object):
 
     def __init__(self, username, password, auth_url, cinder_url,
-                 tenant_id=None, rax_auth=True):
+                 tenant_id=None, admin_tenant_id=None, rax_auth=True):
         self.username = username
         self.password = password
         self.auth_url = auth_url.rstrip('/')
         self.cinder_url = cinder_url.rstrip('/')
-        self.tenant_id = tenant_id
+        self.tenant_id = tenant_id or admin_tenant_id
+        self.admin_tenant_id = admin_tenant_id or tenant_id
         self._token = None
         self.rax_auth = rax_auth
         self.retries = RETRIES
@@ -201,6 +202,56 @@ class CinderClient(object):
         path = '%s/v1/%s/volumes/%s' % (self.cinder_url, self.tenant_id,
                                         volume_id)
         return self.request('DELETE', path, headers, None)
+
+    def get_volume(self, volume_id):
+        headers = {'content-type': 'application/json',
+                   'X-Auth-Token': self.token}
+        path = '%s/v1/%s/volumes/%s' % (self.cinder_url, self.tenant_id,
+                                        volume_id)
+        return self.request('GET', path, headers, None)
+
+    def list_volumes(self):
+        headers = {'content-type': 'application/json',
+                   'X-Auth-Token': self.token}
+        path = '%s/v1/%s/volumes/detail' % (self.cinder_url, self.tenant_id)
+        return self.request('GET', path, headers, None)
+
+    def list_snapshots(self):
+        headers = {'content-type': 'application/json',
+                   'X-Auth-Token': self.token}
+        path = '%s/v1/%s/snapshots/detail' % (self.cinder_url, self.tenant_id)
+        return self.request('GET', path, headers, None)
+
+    def get_snapshot(self, snapshot_id):
+        headers = {'content-type': 'application/json',
+                   'X-Auth-Token': self.token}
+        path = '%s/v1/%s/snapshots/%s' % (self.cinder_url, self.tenant_id, snapshot_id)
+        return self.request('GET', path, headers, None)
+
+    def delete_snapshot(self, snapshot_id):
+        headers = {'content-type': 'application/json',
+                   'X-Auth-Token': self.token}
+        path = '%s/v1/%s/snapshots/%s' % (self.cinder_url, self.tenant_id, snapshot_id)
+        return self.request('DELETE', path, headers, None)
+
+    def quota_defaults(self):
+        headers = {'content-type': 'application/json',
+                   'X-Auth-Token': self.token}
+        # GET http://lunr:8776/v1/account1/os-quota-sets/123/defaults
+        path = '%s/v1/%s/os-quota-sets/defaults' % (self.cinder_url, self.tenant_id)
+        return self.request('GET', path, headers, None)
+
+    def quota_get(self):
+        headers = {'content-type': 'application/json',
+                   'X-Auth-Token': self.token}
+        path = '%s/v1/%s/os-quota-sets/%s' % (self.cinder_url, self.admin_tenant_id, self.tenant_id)
+        return self.request('GET', path, headers, None)
+
+    def quota_update(self, **kwargs):
+        headers = {'content-type': 'application/json',
+                   'X-Auth-Token': self.token}
+        path = '%s/v1/%s/os-quota-sets/%s' % (self.cinder_url, self.admin_tenant_id, self.tenant_id)
+        return self.request('PUT', path, headers, None)
 
 
 def get_args(conf):
