@@ -18,18 +18,11 @@ from __future__ import print_function
 from lunr.orbit import CronJob
 from lunr.common import logger
 from lunr.db.models import Event, Audit, Error
+from lunr.common.purge import PurgeError, FailContinue
 
 import time
 
 log = logger.get_logger('orbit.purgeaccounts')
-
-
-class PurgeError(Exception):
-    pass
-
-
-class FailContinue(PurgeError):
-    pass
 
 
 class PurgeAccounts(CronJob):
