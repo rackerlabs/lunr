@@ -34,29 +34,26 @@ class FailContinue(PurgeError):
 
 class Purge:
 
-    def __init__(self, tenant_id, conf, options):
-        self.creds = {
-            'lunr_url': self.parse(conf.string('terminator', 'span', 'hours=1'))
-        }
-        self.lunr = LunrClient(tenant_id, timeout=10, url=self.creds['lunr_url'],
+    def __init__(self, tenant_id, conf):
+        # TODO: Where in the config is lunr_url defined??????
+        lunr_url = conf.string('terminator', 'lunr_url', 'http://localhost:8080')
+        debug = conf.bool('terminator', 'debug', 'false')
+        admin_tenant_id = conf.string('cinder', 'admin_tenant_id', None)
+
+        self.lunr = LunrClient(tenant_id, timeout=10, url=lunr_url,
                                http_agent='cbs-purge-accounts',
-                               debug=(options.verbose > 1))
-        self.cinder = cinderclient.CinderClient(**cinderclient.get_args(self.config))
+                               debug=debug)
+        self.cinder = cinderclient.CinderClient(**cinderclient.get_args(conf),
+                                                tenant_id=admin_tenant_id)
         self.tenant_id = str(tenant_id)
         self.region = self.parse(conf.string('terminator', 'region', 'none'))
         self.config = conf
 
-#     def log(self, msg):
-#         log.info("DDI: %s (%s) - %s" % (self.tenant_id, self.region, msg))
-#
-#     def debug(self, msg):
-#         if self.verbose:
-#             log.debug("DDI: %s (%s) - %s" % (self.tenant_id, self.region, msg))
-#         else:
-#             self.spin_cursor()
-#
+     def log(self, msg):
+         log.info("DDI: %s - %s" % (self.tenant_id, msg))
+
     @staticmethod
-    def wait_on_status(self, func, status):
+    def wait_on_status(func, status):
         for i in range(20):
             resp = func()
             if resp.status == status:
@@ -67,7 +64,7 @@ class Purge:
     def delete_backup(self, backup):
         # Skip backups already in a deleting status
         if backup['status'] in ('DELETING', 'DELETED'):
-            log.debug("SKIP - Backup %s in status of %s"
+            self.log("SKIP - Backup %s in status of %s"
                        % (backup['id'], backup['status']))
             return False
 
@@ -81,8 +78,8 @@ class Purge:
                      % (backup['id'], backup['status']))
             self.cinder.volume_snapshots.delete(str(backup['id']))
         except NotFound:
-            log.debug("WARNING - Snapshot already deleted - Cinder returned "
-                     "404 on delete call %s" % backup['id'])
+            self.debug("WARNING - Snapshot already deleted - Cinder returned "
+                      "404 on delete call %s" % backup['id'])
             return True
 
         try:
@@ -109,7 +106,7 @@ class Purge:
             payload = StorageClient(node_url, debug=(self.verbose > 1))\
                 .exports.get(volume['id'])
             return self._is_connected(payload)
-        except LunrHttpError, e:
+        except LunrHttpError as e:
             if e.code == 404:
                 return False
             raise
@@ -171,11 +168,6 @@ class Purge:
                      % (volume['id'], volume['status']))
             return False
 
-        if self.report_only:
-            self.log("Found Volume '%s' in status '%s'"
-                     % (volume['id'], volume['status']))
-            return True
-
         # Catch statuses we may have missed
         if volume['status'] != 'ACTIVE':
             raise FailContinue("Refusing to delete volume %s in status of %s"
@@ -235,7 +227,7 @@ class Purge:
                 verb = 'Found' if self.report_only else 'Purged'
                 self.log("%s %s" % (verb, self.report(self.total)))
                 return True
-        except (LunrError, ClientException), e:
+        except (LunrError, ClientException) as e:
             raise FailContinue(str(e))
         return False
 
