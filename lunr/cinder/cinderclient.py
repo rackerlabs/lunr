@@ -237,7 +237,6 @@ class CinderClient(object):
     def quota_defaults(self):
         headers = {'content-type': 'application/json',
                    'X-Auth-Token': self.token}
-        # GET http://lunr:8776/v1/account1/os-quota-sets/123/defaults
         path = '%s/v1/%s/os-quota-sets/defaults' % (self.cinder_url, self.tenant_id)
         return self.request('GET', path, headers, None)
 
@@ -247,11 +246,12 @@ class CinderClient(object):
         path = '%s/v1/%s/os-quota-sets/%s' % (self.cinder_url, self.admin_tenant_id, self.tenant_id)
         return self.request('GET', path, headers, None)
 
-    def quota_update(self, **kwargs):
+    # cinder.quota_update( { 'volume': -1 } )
+    def quota_update(self, fields):
         headers = {'content-type': 'application/json',
                    'X-Auth-Token': self.token}
         path = '%s/v1/%s/os-quota-sets/%s' % (self.cinder_url, self.admin_tenant_id, self.tenant_id)
-        return self.request('PUT', path, headers, None)
+        return self.request('PUT', path, headers, json.dumps(fields))
 
 
 def get_args(conf):

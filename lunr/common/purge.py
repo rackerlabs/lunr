@@ -13,12 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import lunrclient
 from lunrclient.client import LunrClient, StorageClient
 from lunr.cinder import cinderclient
-# from lunrclient import LunrError, LunrHttpError
-from lunr.cinder.cinderclient import NotFound, ClientException, BadRequest
+from lunr.common.exc import ClientException
+from lunr.cinder.cinderclient import CinderClient
 from lunr.common import logger
+from lunrclient.base import LunrError, LunrHttpError
 import time
 
 log = logger.get_logger('orbit.purge')
@@ -32,25 +32,31 @@ class FailContinue(PurgeError):
     pass
 
 
+class NotFound(PurgeError):
+    pass
+
+
+class BadRequest(PurgeError):
+    pass
+
+
 class Purge:
 
     def __init__(self, tenant_id, conf):
-        # TODO: Where in the config is lunr_url defined??????
-        lunr_url = conf.string('terminator', 'lunr_url', 'http://localhost:8080')
-        debug = conf.bool('terminator', 'debug', 'false')
-        admin_tenant_id = conf.string('cinder', 'admin_tenant_id', None)
-
-        self.lunr = LunrClient(tenant_id, timeout=10, url=lunr_url,
-                               http_agent='cbs-purge-accounts',
-                               debug=debug)
-        self.cinder = cinderclient.CinderClient(**cinderclient.get_args(conf),
-                                                tenant_id=admin_tenant_id)
-        self.tenant_id = str(tenant_id)
-        self.region = self.parse(conf.string('terminator', 'region', 'none'))
+        self.lunr_url = conf.string('terminator', 'lunr_url', 'http://localhost:8080')
+        self.debug = conf.bool('terminator', 'debug', 'false')
+        self.admin_tenant_id = conf.string('cinder', 'admin_tenant_id', None)
         self.config = conf
+        self.lunr = LunrClient(tenant_id, timeout=10, url=self.lunr_url,
+                               http_agent='cbs-purge-accounts',
+                               debug=self.debug)
+        self.cinder = CinderClient(tenant_id=self.admin_tenant_id, **cinderclient.get_args(conf))
+        self.tenant_id = str(tenant_id)
+        self.total = {}
+        self.throttle = 1
 
-     def log(self, msg):
-         log.info("DDI: %s - %s" % (self.tenant_id, msg))
+    def log(self, msg):
+        log.info("DDI: %s - %s" % (self.tenant_id, msg))
 
     @staticmethod
     def wait_on_status(func, status):
@@ -65,7 +71,7 @@ class Purge:
         # Skip backups already in a deleting status
         if backup['status'] in ('DELETING', 'DELETED'):
             self.log("SKIP - Backup %s in status of %s"
-                       % (backup['id'], backup['status']))
+                     % (backup['id'], backup['status']))
             return False
 
         # Catch statuses we may have missed
@@ -75,16 +81,16 @@ class Purge:
 
         try:
             log.debug("Attempting to delete snapshot %s in status %s"
-                     % (backup['id'], backup['status']))
-            self.cinder.volume_snapshots.delete(str(backup['id']))
+                      % (backup['id'], backup['status']))
+            self.cinder.delete_snapshot(str(backup['id']))
         except NotFound:
-            self.debug("WARNING - Snapshot already deleted - Cinder returned "
-                      "404 on delete call %s" % backup['id'])
+            self.log("WARNING - Snapshot already deleted - Cinder returned "
+                     "404 on delete call %s" % backup['id'])
             return True
 
         try:
             # Wait until snapshot is deleted
-            if self.wait_on_status(lambda: self.cinder.volume_snapshots.get(
+            if self.wait_on_status(lambda: self.cinder.get_snapshot(
                     str(backup['id'])), 'deleted'):
                 return True
             raise FailContinue("Snapshot '%s' never changed to status of "
@@ -96,14 +102,14 @@ class Purge:
     def is_volume_connected(self, volume):
         try:
             # Create a client with 'admin' as the tenant_id
-            client = LunrClient('admin', url=self.creds['lunr_url'],
-                                debug=(self.verbose > 1))
+            client = LunrClient('admin', url=self.lunr_url,
+                                debug=self.debug)
             # Query the node for this volume
             node = client.nodes.get(volume['node_id'])
             # Build a node url for the storage client to use
             node_url = "http://%s:%s" % (node['hostname'], node['port'])
             # Get the exports for this volume
-            payload = StorageClient(node_url, debug=(self.verbose > 1))\
+            payload = StorageClient(node_url, debug=self.debug)\
                 .exports.get(volume['id'])
             return self._is_connected(payload)
         except LunrHttpError as e:
@@ -111,7 +117,8 @@ class Purge:
                 return False
             raise
 
-    def _is_connected(self, payload):
+    @staticmethod
+    def _is_connected(payload):
         if 'error' in payload:
             return False
         if payload:
@@ -122,7 +129,7 @@ class Purge:
 
     def clean_up_volume(self, volume):
         # Ask cinder for the volume status
-        resp = self.cinder.volumes.get(volume['id'])
+        resp = self.cinder.get_volume(volume['id'])
 
         # If the status is 'in-use'
         if resp.status == 'in-use':
@@ -134,11 +141,10 @@ class Purge:
                 try:
                     self.log("Volume '%s' stuck in attached state, "
                              "attempting to detach" % volume['id'])
-                    return self.cinder.rackspace_python_cinderclient_ext\
-                        .force_detach(volume['id'])
+                    return self.cinder.detach(volume['id'])
                 except AttributeError:
-                    raise Fail("rackspace_python_cinderclient_ext is not"
-                               " installed, and is required to force detach")
+                    raise FailContinue("rackspace_python_cinderclient_ext is not"
+                                       " installed, and is required to force detach")
             raise FailContinue("Volume '%s' appears to be still connected "
                                "to a hypervisor" % volume['id'])
 
@@ -176,7 +182,7 @@ class Purge:
         try:
             self.log("Attempting to delete volume %s in status %s"
                      % (volume['id'], volume['status']))
-            self.cinder.volumes.delete(str(volume['id']))
+            self.cinder.delete_volume(str(volume['id']))
         except NotFound:
             self.log("WARNING - Volume already deleted - Cinder returned "
                      "404 on delete call %s" % volume['id'])
@@ -184,7 +190,7 @@ class Purge:
 
         try:
             # Wait until volume reports deleted
-            if self.wait_on_status(lambda: self.cinder.volumes.get(
+            if self.wait_on_status(lambda: self.cinder.get_volume(
                     str(volume['id'])), 'deleted'):
                 return
             raise FailContinue("Volume '%s' never changed to status of"
@@ -220,7 +226,7 @@ class Purge:
                     self.incr_volume(volume)
 
             # Delete any quotas for this account
-            self.delete_quotas(self.tenant_id)
+            self.delete_quotas()
 
             # If we found anything to purge, report it here
             if self.total['volumes'] != 0 or self.total['backups'] != 0:
@@ -231,16 +237,16 @@ class Purge:
             raise FailContinue(str(e))
         return False
 
-    def delete_quotas(self, tenant_id):
+    def delete_quotas(self):
         # (Quotas should return to defaults if there were any)
         # self.cinder.quotas.delete(self.tenant_id)
 
         # NOTE: The following is a temporary fix until we upgrade from havana
 
         # Get the default quotas
-        defaults = self.cinder.quotas.defaults(tenant_id)
+        defaults = self.cinder.quota_defaults()
         # Get the actual quotas for this tenant
-        quotas = self.cinder.quotas.get(tenant_id)
+        quotas = self.cinder.quota_get()
         updates = {}
         for quota_name in quotas.__dict__.keys():
             # Skip hidden attributes on the QuotaSet object
@@ -253,4 +259,4 @@ class Purge:
         if len(updates) > 0:
             self.log("Found non-default quotas, setting quotas [%s] to zero"
                      % ','.join(updates))
-            self.cinder.quotas.update(tenant_id, **updates)
+            self.cinder.quota_update(**updates)
