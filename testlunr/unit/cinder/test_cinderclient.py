@@ -493,5 +493,129 @@ class TestCinderClient(unittest.TestCase):
 
         self.assert_(get_request.called)
 
+    def test_list_snapshots(self):
+
+        def get_request(req):
+            expected_url = 'http://cinder:8776/v1/fake/snapshots/detail'
+            self.assertEquals(req.get_full_url(), expected_url)
+            self.assertEquals(req.get_method(), 'GET')
+            expected_headers = {
+                'Content-type': 'application/json',
+                'X-auth-token': 'fake',
+            }
+            self.assertEquals(req.headers, expected_headers)
+            return MockResponse()
+
+        self.urllib2.responses = iter([_stub_auth_response,
+                                       get_request])
+
+        self.client.list_snapshots()
+
+        self.assert_(get_request.called)
+
+    def test_get_snapshot(self):
+
+        def get_request(req):
+            expected_url = 'http://cinder:8776/v1/fake/snapshots/snap1'
+            self.assertEquals(req.get_full_url(), expected_url)
+            self.assertEquals(req.get_method(), 'GET')
+            expected_headers = {
+                'Content-type': 'application/json',
+                'X-auth-token': 'fake',
+            }
+            self.assertEquals(req.headers, expected_headers)
+            return MockResponse()
+
+        self.urllib2.responses = iter([_stub_auth_response,
+                                       get_request])
+
+        self.client.get_snapshot('snap1')
+
+        self.assert_(get_request.called)
+
+    def test_delete_snapshot(self):
+
+        def delete_request(req):
+            expected_url = 'http://cinder:8776/v1/fake/snapshots/snap1'
+            self.assertEquals(req.get_full_url(), expected_url)
+            self.assertEquals(req.get_method(), 'DELETE')
+            expected_headers = {
+                'Content-type': 'application/json',
+                'X-auth-token': 'fake',
+            }
+            self.assertEquals(req.headers, expected_headers)
+            return MockResponse()
+
+        self.urllib2.responses = iter([_stub_auth_response,
+                                       delete_request])
+
+        self.client.delete_snapshot('snap1')
+
+        self.assert_(delete_request.called)
+
+    def test_quota_defaults(self):
+
+        def get_request(req):
+            expected_url = 'http://cinder:8776/v1/fake/os-quota-sets/defaults'
+            self.assertEquals(req.get_full_url(), expected_url)
+            self.assertEquals(req.get_method(), 'GET')
+            expected_headers = {
+                'Content-type': 'application/json',
+                'X-auth-token': 'fake',
+            }
+            self.assertEquals(req.headers, expected_headers)
+            return MockResponse()
+
+        self.urllib2.responses = iter([_stub_auth_response,
+                                       get_request])
+
+        self.client.quota_defaults()
+
+        self.assert_(get_request.called)
+
+    def test_quota_get(self):
+
+        def get_request(req):
+            expected_url = 'http://cinder:8776/v1/fake-admin/os-quota-sets/fake'
+            self.assertEquals(req.get_full_url(), expected_url)
+            self.assertEquals(req.get_method(), 'GET')
+            expected_headers = {
+                'Content-type': 'application/json',
+                'X-auth-token': 'fake',
+            }
+            self.assertEquals(req.headers, expected_headers)
+            return MockResponse()
+
+        self.urllib2.responses = iter([_stub_auth_response,
+                                       get_request])
+
+        self.client.quota_get()
+
+        self.assert_(get_request.called)
+
+    def test_quota_update(self):
+
+        def put_request(req):
+            expected_url = 'http://cinder:8776/v1/fake-admin/os-quota-sets/fake'
+            self.assertEquals(req.get_full_url(), expected_url)
+            self.assertEquals(req.get_method(), 'PUT')
+            expected_data = json.dumps({
+                'volume': 'vol1',
+            })
+            self.assertEquals(req.data, expected_data)
+            expected_headers = {
+                'Content-type': 'application/json',
+                'X-auth-token': 'fake',
+            }
+            self.assertEquals(req.headers, expected_headers)
+            return MockResponse()
+
+        self.urllib2.responses = iter([_stub_auth_response,
+                                       put_request])
+
+        self.client.quota_update({'volume': 'vol1'})
+
+        self.assert_(put_request.called)
+
 if __name__ == "__main__":
     unittest.main()
