@@ -18,7 +18,7 @@ from __future__ import print_function
 from lunr.orbit import CronJob
 from lunr.common import logger
 from lunr.db.models import Event, Audit, Error
-from lunr.common.purge import PurgeError, FailContinue
+from lunr.common.purge import Purge, PurgeError, FailContinue
 
 import time
 
@@ -69,6 +69,7 @@ class PurgeAccounts(CronJob):
 
         # accounts = self.fetch_accounts()
         # log.info("Feed returned '%d' tenant_id's to close" % len(accounts))
+        account_counter = 0
 
         # Iterate over the list of deletable accounts
         for event in self.fetch_events():
@@ -78,15 +79,17 @@ class PurgeAccounts(CronJob):
                 time.sleep(self.options['throttle'])
                 # Mark the account as done
                 self.save_to_audit(event)
+                account_counter += 1
             except PurgeError as e:
                 # Log the error and continue to attempt purges
                 log.error("Purge for %s failed on event %s - %s" % (event.tenant_id, event.event_id, e))
                 self.log_error_to_db(e, event)
 
         # Print out the purge totals
+        log.info("Processed {0} accounts in this run".format(account_counter))
         self.print_totals()
 
-    def print_totals(self):
+    def print_totals(self):  # pragma: no cover
         log.info("Grand Total - %s " % self.total)
 
     def collect_totals(self, purger):
@@ -105,11 +108,11 @@ class PurgeAccounts(CronJob):
 
         try:
             log.debug("Tenant ID: %s" % tenant_id)
-            # purger = Purge(tenant_id, self.config, options)
-            # if purger.purge():
-            #     # If we found something for this tenant
-            #     self.collect_totals(purger)
-            #     found = True
+            purger = Purge(tenant_id, self.config)
+            if purger.purge():
+                # If we found something for this tenant
+                self.collect_totals(purger)
+                found = True
 
         except FailContinue:
             self.collect_totals(purger)
@@ -131,5 +134,5 @@ class PurgeAccounts(CronJob):
         self.session.add(record)
         # Delete the processed event from queue
         self.session.delete(event)
-        self.session.commit()
+        # self.session.commit()
 
