@@ -34,10 +34,15 @@ class PurgeAccounts(CronJob):
         self.span = self.parse(conf.string('terminator', 'span', 'hours=1'))
         self.interval = self.parse(conf.string('terminator', 'interval', 'seconds=5'))
         self.timeout = conf.float('orbit', 'timeout', 120)
-        self.total = 0
+        self.total = {
+            'backups': 0,
+            'backup-size': 0,
+            'volumes': 0,
+            'vtypes': {}
+        }
         self.options = {'throttle': 1, 'verbose': True}
 
-    def log_error_to_db(self, error, event=None, e_type="processing"):
+    def log_error_to_db(self, error=None, event=None, e_type="processing"):
         """ Log error/exception to db """
         event_id, tenant_id = None, None
         if event is not None:
@@ -65,7 +70,6 @@ class PurgeAccounts(CronJob):
             self.log_error_to_db(e)
 
     def run(self):
-        log.info("purge accounts job is online")
 
         # accounts = self.fetch_accounts()
         # log.info("Feed returned '%d' tenant_id's to close" % len(accounts))
@@ -79,12 +83,14 @@ class PurgeAccounts(CronJob):
                 time.sleep(self.options['throttle'])
                 # Mark the account as done
                 self.save_to_audit(event)
+                self.remove_errors(event, "processing")
                 account_counter += 1
             except PurgeError as e:
                 # Log the error and continue to attempt purges
                 log.error("Purge for %s failed on event %s - %s" % (event.tenant_id, event.event_id, e))
                 self.log_error_to_db(e, event)
-
+            #except Exception as e:
+                #log.error(e)
         # Print out the purge totals
         log.info("Processed {0} accounts in this run".format(account_counter))
         self.print_totals()
@@ -96,11 +102,11 @@ class PurgeAccounts(CronJob):
         self.total['volumes'] += purger.total['volumes']
         self.total['backups'] += purger.total['backups']
         self.total['backup-size'] += purger.total['backup-size']
-        for key in purger.total['vtypes'].keys():
-            try:
-                self.total['vtypes'][key] += purger.total['vtypes'][key]
-            except KeyError:
-                self.total['vtypes'][key] = purger.total['vtypes'][key]
+#        for key in purger.total['vtypes'].keys():
+#            try:
+#                self.total['vtypes'][key] += purger.total['vtypes'][key]
+#            except KeyError:
+#                self.total['vtypes'][key] = purger.total['vtypes'][key]
 
     def run_purge(self, tenant_id):
         found = False
@@ -120,10 +126,9 @@ class PurgeAccounts(CronJob):
 
         if not found and self.options['verbose']:
             log.info("No Volumes or Backups to purge for '%s'" % tenant_id)
-            return True
+            return
         if found or self.options['verbose']:
             log.info("Purge of '%s' Completed Successfully" % tenant_id)
-        return True
 
     def fetch_events(self):
         events = self.session.query(Event).limit(100)

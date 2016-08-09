@@ -248,10 +248,14 @@ class CinderClient(object):
 
     # cinder.quota_update( { 'volume': -1 } )
     def quota_update(self, fields):
+        # PUT http://lunr:8776/v1/account1/os-quota-sets/account1
+        # '{"quota_set": {"tenant_id": "account1", "volumes": 42}}'
+        update = {'quota_set': dict(tenant_id=self.tenant_id, **fields)}
+
         headers = {'content-type': 'application/json',
                    'X-Auth-Token': self.token}
         path = '%s/v1/%s/os-quota-sets/%s' % (self.cinder_url, self.admin_tenant_id, self.tenant_id)
-        return self.request('PUT', path, headers, json.dumps(fields))
+        return self.request('PUT', path, headers, json.dumps(update))
 
 
 def get_args(conf):
