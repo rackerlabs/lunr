@@ -52,8 +52,13 @@ class Purge:
                                debug=self.debug)
         self.cinder = CinderClient(tenant_id=self.admin_tenant_id, **cinderclient.get_args(conf))
         self.tenant_id = str(tenant_id)
-        self.total = {}
         self.throttle = 1
+        self.total = {
+            'backups': 0,
+            'backup-size': 0,
+            'volumes': 0,
+            'vtypes': {}
+        }
 
     def log(self, msg):
         log.info("DDI: %s - %s" % (self.tenant_id, msg))
@@ -229,9 +234,9 @@ class Purge:
             self.delete_quotas()
 
             # If we found anything to purge, report it here
+            print("total: %s" % self.total)
             if self.total['volumes'] != 0 or self.total['backups'] != 0:
-                verb = 'Found' if self.report_only else 'Purged'
-                self.log("%s %s" % (verb, self.report(self.total)))
+                self.log("Purged %s" %  self.report(self.total))
                 return True
         except (LunrError, ClientException) as e:
             raise FailContinue(str(e))
@@ -245,10 +250,12 @@ class Purge:
 
         # Get the default quotas
         defaults = self.cinder.quota_defaults()
+        defaults = defaults.get('quota-set', {})
         # Get the actual quotas for this tenant
         quotas = self.cinder.quota_get()
+        quotas = quotas.get('quota-set', {})
         updates = {}
-        for quota_name in quotas.__dict__.keys():
+        for quota_name in quotas.keys():
             # Skip hidden attributes on the QuotaSet object
             if quota_name.startswith('_'):
                 continue

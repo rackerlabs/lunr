@@ -14,11 +14,12 @@
 # limitations under the License.
 
 import unittest
+from collections import defaultdict
 
 from lunr.common.config import LunrConfig
-from lunr.db.models import Error, Event, Marker
-from lunr.common import cloudfeedclient
+from lunr.db.models import Error, Event, Marker, Audit
 from lunr import db
+import lunr.orbit.jobs.purgeaccounts
 from lunr.orbit.jobs.purgeaccounts import PurgeAccounts
 from testlunr.unit import patch
 
@@ -40,6 +41,9 @@ class TestPurgeAccounts(unittest.TestCase):
         self.sess = db.configure(self.conf)
         self.log = MockLog()
         self.reader = PurgeAccounts(self.conf, self.sess)
+
+    def tearDown(self):
+        self.sess.close()
 
     # def test_run(self):
     #    self.reader.run()
@@ -64,8 +68,63 @@ class TestPurgeAccounts(unittest.TestCase):
     def test_remove_errors(self):
         mock_error = Error(event_id="123", tenant_id="456",
                            message=str("Test Exception"), type="test")
+        mock_event = Event(event_id="123", tenant_id="456")
         self.sess.add(mock_error)
-        self.reader.remove_errors("test")
+        self.reader.remove_errors(mock_event, "test")
         obj = self.sess.query(Error).filter(Error.type == "test").first()
         self.assertEqual(obj, None)
 
+    def test_run_purge_success(self):
+        class FakePurge(object):
+            def __init__(self, tenant, config):
+                self.total = defaultdict(int)
+                pass
+
+            def purge(self):
+                return True
+        original_purge = lunr.orbit.jobs.purgeaccounts.Purge
+        lunr.orbit.jobs.purgeaccounts.Purge = FakePurge
+        try:
+            result = self.reader.run_purge("123")
+        finally:
+            lunr.orbit.jobs.purgeaccounts.Purge = original_purge
+
+        self.assertTrue(result)
+
+
+    def test_run_purge_fail(self):
+        class FakePurge(object):
+            def __init__(self, tenant, config):
+                self.total = defaultdict(int)
+                pass
+
+            def purge(self):
+                return False
+        original_purge = lunr.orbit.jobs.purgeaccounts.Purge
+        lunr.orbit.jobs.purgeaccounts.Purge = FakePurge
+        try:
+            result = self.reader.run_purge("123")
+        finally:
+            lunr.orbit.jobs.purgeaccounts.Purge = original_purge
+
+        self.assertFalse(result)
+
+    def test_collect_totals(self):
+        pass
+
+    def test_fetch_events(self):
+        events = self.reader.fetch_events()
+        self.assertIsNotNone(events)
+
+    def tests_save_to_audit(self):
+        mock_event = Event(tenant_id='1234', event_id='2345')
+        self.sess.add(mock_event)
+        self.sess.commit()
+        self.reader.save_to_audit(mock_event)
+        # fetch audit record
+        audited_record = self.sess.query(Audit).filter(Audit.event_id == mock_event.event_id).first()
+        self.assertEquals(audited_record.event_id, mock_event.event_id)
+        self.assertEquals(audited_record.tenant_id, mock_event.tenant_id)
+        # check for deleted event
+        empty_event = self.sess.query(Event).filter(Event.event_id == mock_event.event_id).first()
+        self.assertIsNone(empty_event)
