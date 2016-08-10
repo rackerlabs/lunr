@@ -19,7 +19,7 @@ from lunr.orbit import CronJob
 from lunr.common import logger
 from lunr.db.models import Event, Error
 from lunr.common.purge import Purge, PurgeError, FailContinue
-from sqlalchemy import and_
+from sqlalchemy import and_,or_
 
 import time
 import datetime
@@ -74,13 +74,7 @@ class PurgeAccounts(CronJob):
 
     def run(self):
 
-        # accounts = self.fetch_accounts()
-        # log.info("Feed returned '%d' tenant_id's to close" % len(accounts))
         account_counter = 0
-
-        self.retry_events()
-        exit(0)
-
         # Iterate over the list of deletable accounts
         for event in self.fetch_events():
             try:
@@ -95,8 +89,8 @@ class PurgeAccounts(CronJob):
                 # Log the error and continue to attempt purges
                 log.error("Purge for %s failed on event %s - %s" % (event.tenant_id, event.event_id, e))
                 self.log_error_to_db(e, event)
-            #except Exception as e:
-                #log.error(e)
+            except Exception as e:
+                log.error(e)
 
         # Print out the purge totals
         log.info("Processed {0} accounts in this run".format(account_counter))
@@ -132,23 +126,22 @@ class PurgeAccounts(CronJob):
             raise
 
         if not found and self.options['verbose']:
-            log.info("No Volumes or Backups to purge for '%s'" % tenant_id)
+            log.debug("No Volumes or Backups to purge for '%s'" % tenant_id)
             return
         if found or self.options['verbose']:
-            log.info("Purge of '%s' Completed Successfully" % tenant_id)
-
-    def retry_events(self):
-        time_delta = datetime.datetime.utcnow() - datetime.timedelta(seconds=self.delta)
-        events = self.session.query(Event).filter(and_(Event.processed == False, datetime.datetime.strptime(Event.last_purged, "%Y-%m-%d %H:%M:%S") <= time_delta)).limit(10)
-        return events
+            log.debug("Purge of '%s' Completed Successfully" % tenant_id)
 
     def fetch_events(self):
-        events = self.session.query(Event).limit(100)
+        time_delta = datetime.datetime.utcnow() - datetime.timedelta(seconds=self.delta)
+        events = self.session.query(Event).\
+            filter(and_(Event.processed == 'No',
+                        or_(Event.last_purged <= time_delta,
+                            Event.last_purged == None))).limit(100)
         return events
 
     def save_to_audit(self, event):
         event.last_purged = datetime.datetime.utcnow()
-        event.processed = True
+        event.processed = 'Yes'
         self.session.add(event)
         # self.session.commit()
 

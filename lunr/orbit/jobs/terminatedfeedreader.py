@@ -116,7 +116,7 @@ class TerminatedFeedReader(CronJob):
             event_id=event['id'],
             tenant_id=event['tenantId'],
             timestamp=event_time,
-            processed=False,
+            processed='No',
             last_purged=None
         )
         self.session.add(new_event)

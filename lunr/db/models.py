@@ -352,7 +352,7 @@ class Event(ModelBase):
     event_id = Column(String(45), unique=True, nullable=False)
     tenant_id = Column(String(20), index=True, nullable=False)
     timestamp = Column(DateTime, nullable=False)
-    processed = Column(Boolean, nullable=False)
+    processed = Column(String(5), nullable=False)
     last_purged = Column(DateTime, nullable=True)
 
 
