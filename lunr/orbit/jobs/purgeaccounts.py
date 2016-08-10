@@ -34,9 +34,9 @@ class PurgeAccounts(CronJob):
         self.config = conf
         self.session = session
         self.span = self.parse(conf.string('terminator', 'span', 'hours=1'))
-        self.interval = self.parse(conf.string('terminator', 'interval', 'seconds=5'))
+        self.interval = self.parse(conf.string('terminator', 'interval', 'seconds=60'))
         self.timeout = conf.float('orbit', 'timeout', 120)
-        self.delta = 86400  # 24 hours in seconds
+        self.delta = 86400  # 24*60*60 seconds
         self.total = {
             'backups': 0,
             'backup-size': 0,
@@ -68,7 +68,6 @@ class PurgeAccounts(CronJob):
             if error is None:
                 return
             self.session.delete(error)
-            self.session.commit()
         except PurgeError as e:
             self.log_error_to_db(e)
 
@@ -82,7 +81,7 @@ class PurgeAccounts(CronJob):
                 self.run_purge(account)
                 time.sleep(self.options['throttle'])
                 # Mark the account as done
-                self.save_to_audit(event)
+                self.save_processed_event(event)
                 self.remove_errors(event, "processing")
                 account_counter += 1
             except PurgeError as e:
@@ -103,11 +102,11 @@ class PurgeAccounts(CronJob):
         self.total['volumes'] += purger.total['volumes']
         self.total['backups'] += purger.total['backups']
         self.total['backup-size'] += purger.total['backup-size']
-#        for key in purger.total['vtypes'].keys():
-#            try:
-#                self.total['vtypes'][key] += purger.total['vtypes'][key]
-#            except KeyError:
-#                self.total['vtypes'][key] = purger.total['vtypes'][key]
+        for key in purger.total['vtypes'].keys():
+            try:
+                self.total['vtypes'][key] += purger.total['vtypes'][key]
+            except KeyError:
+                self.total['vtypes'][key] = purger.total['vtypes'][key]
 
     def run_purge(self, tenant_id):
         found = False
@@ -139,9 +138,9 @@ class PurgeAccounts(CronJob):
                             Event.last_purged == None))).limit(100)
         return events
 
-    def save_to_audit(self, event):
+    def save_processed_event(self, event):
         event.last_purged = datetime.datetime.utcnow()
         event.processed = 'Yes'
         self.session.add(event)
-        # self.session.commit()
+        self.session.commit()
 
