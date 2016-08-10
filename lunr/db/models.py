@@ -351,21 +351,9 @@ class Event(ModelBase):
     id = Column(Integer, primary_key=True, nullable=False)
     event_id = Column(String(45), unique=True, nullable=False)
     tenant_id = Column(String(20), index=True, nullable=False)
-
-
-@DateFields
-class Audit(ModelBase):
-    __tablename__ = 'audit'
-    __table_args__ = ({
-        'mysql_engine': 'InnoDB',
-        'mysql_charset': 'utf8',
-    })
-    __immutable_columns__ = ['id']
-
-    id = Column(Integer, primary_key=True, nullable=False)
-    event_id = Column(String(50), index=True, nullable=False)
-    tenant_id = Column(String(20), index=True, nullable=False)
-    type = Column(String(15), nullable=False)
+    timestamp = Column(DateTime, nullable=False)
+    processed = Column(Boolean, nullable=False)
+    last_purged = Column(DateTime, nullable=True)
 
 
 @DateFields

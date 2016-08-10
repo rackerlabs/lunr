@@ -22,6 +22,7 @@ from lunr.cinder.cinderclient import CinderError
 from lunr.cinder import cinderclient
 import sqlalchemy.exc
 from lunr.db.models import Event, Error, Marker
+import datetime
 
 console_logger = logger.get_logger('orbit.terminatedfeedreader')
 
@@ -110,9 +111,13 @@ class TerminatedFeedReader(CronJob):
 
     def save_event(self, event):
         """ Save event to database """
+        event_time = datetime.datetime.strptime(event['eventTime'], '%Y-%m-%dT%H:%M:%S.%fZ')
         new_event = Event(
             event_id=event['id'],
-            tenant_id=event['tenantId']
+            tenant_id=event['tenantId'],
+            timestamp=event_time,
+            processed=False,
+            last_purged=None
         )
         self.session.add(new_event)
 
