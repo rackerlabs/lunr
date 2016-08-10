@@ -48,7 +48,7 @@ events = Table(
     Column('event_id', String(45), unique=True, nullable=False),
     Column('tenant_id', String(20), index=True, nullable=False),
     Column('timestamp', DateTime, nullable=False),
-    Column('processed', Boolean, nullable=False),
+    Column('processed', String(5), nullable=False),
     Column('last_purged', DateTime, nullable=True),
     Column('created_at', DateTime),
     Column('last_modified', DateTime),
