@@ -23,16 +23,6 @@ table_kwargs = {
     'mysql_charset': 'utf8',
 }
 
-audit = Table(
-    'audit', meta,
-    Column('id', Integer, primary_key=True, nullable=False),
-    Column('event_id', String(50), index=True, nullable=False),
-    Column('tenant_id', String(20), index=True, nullable=False),
-    Column('type', String(15), nullable=False),
-    Column('created_at', DateTime),
-    Column('last_modified', DateTime),
-    **table_kwargs
-)
 error = Table(
     'error', meta,
     Column('id', Integer, primary_key=True, nullable=False),
@@ -57,6 +47,9 @@ events = Table(
     Column('id', Integer, primary_key=True, nullable=False),
     Column('event_id', String(45), unique=True, nullable=False),
     Column('tenant_id', String(20), index=True, nullable=False),
+    Column('timestamp', DateTime, nullable=False),
+    Column('processed', Boolean, nullable=False),
+    Column('last_purged', DateTime, nullable=True),
     Column('created_at', DateTime),
     Column('last_modified', DateTime),
     **table_kwargs
@@ -67,7 +60,6 @@ def upgrade(migrate_engine):
     # Upgrade operations go here. Don't create your own engine; bind
     # migrate_engine to your metadata
     meta.bind = migrate_engine
-    audit.create()
     error.create()
     marker.create()
     events.create()
@@ -76,7 +68,6 @@ def upgrade(migrate_engine):
 def downgrade(migrate_engine):
     # Operations to reverse the above upgrade go here.
     meta.bind = migrate_engine
-    audit.drop()
     error.drop()
     marker.drop()
     events.drop()

@@ -17,10 +17,12 @@ from __future__ import print_function
 
 from lunr.orbit import CronJob
 from lunr.common import logger
-from lunr.db.models import Event, Audit, Error
+from lunr.db.models import Event, Error
 from lunr.common.purge import Purge, PurgeError, FailContinue
+from sqlalchemy import and_
 
 import time
+import datetime
 
 log = logger.get_logger('orbit.purgeaccounts')
 
@@ -34,6 +36,7 @@ class PurgeAccounts(CronJob):
         self.span = self.parse(conf.string('terminator', 'span', 'hours=1'))
         self.interval = self.parse(conf.string('terminator', 'interval', 'seconds=5'))
         self.timeout = conf.float('orbit', 'timeout', 120)
+        self.delta = 86400  # 24 hours in seconds
         self.total = {
             'backups': 0,
             'backup-size': 0,
@@ -75,6 +78,9 @@ class PurgeAccounts(CronJob):
         # log.info("Feed returned '%d' tenant_id's to close" % len(accounts))
         account_counter = 0
 
+        self.retry_events()
+        exit(0)
+
         # Iterate over the list of deletable accounts
         for event in self.fetch_events():
             try:
@@ -91,6 +97,7 @@ class PurgeAccounts(CronJob):
                 self.log_error_to_db(e, event)
             #except Exception as e:
                 #log.error(e)
+
         # Print out the purge totals
         log.info("Processed {0} accounts in this run".format(account_counter))
         self.print_totals()
@@ -130,14 +137,18 @@ class PurgeAccounts(CronJob):
         if found or self.options['verbose']:
             log.info("Purge of '%s' Completed Successfully" % tenant_id)
 
+    def retry_events(self):
+        time_delta = datetime.datetime.utcnow() - datetime.timedelta(seconds=self.delta)
+        events = self.session.query(Event).filter(and_(Event.processed == False, datetime.datetime.strptime(Event.last_purged, "%Y-%m-%d %H:%M:%S") <= time_delta)).limit(10)
+        return events
+
     def fetch_events(self):
         events = self.session.query(Event).limit(100)
         return events
 
     def save_to_audit(self, event):
-        record = Audit(event_id=event.event_id, tenant_id=event.tenant_id, type='TERMINATED')
-        self.session.add(record)
-        # Delete the processed event from queue
-        self.session.delete(event)
+        event.last_purged = datetime.datetime.utcnow()
+        event.processed = True
+        self.session.add(event)
         # self.session.commit()
 
