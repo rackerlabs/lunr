@@ -61,7 +61,7 @@ class Purge:
         }
 
     def log(self, msg):
-        log.info("DDI: %s - %s" % (self.tenant_id, msg))
+        log.debug("DDI: %s - %s" % (self.tenant_id, msg))
 
     @staticmethod
     def wait_on_status(func, status):
@@ -85,7 +85,7 @@ class Purge:
                                % (backup['id'], backup['status']))
 
         try:
-            log.debug("Attempting to delete snapshot %s in status %s"
+            self.log("Attempting to delete snapshot %s in status %s"
                       % (backup['id'], backup['status']))
             self.cinder.delete_snapshot(str(backup['id']))
         except NotFound:
@@ -236,7 +236,7 @@ class Purge:
             # If we found anything to purge, report it here
             print("total: %s" % self.total)
             if self.total['volumes'] != 0 or self.total['backups'] != 0:
-                self.log("Purged %s" %  self.report(self.total))
+                self.log("Purged %s" % self.total)
                 return True
         except (LunrError, ClientException) as e:
             raise FailContinue(str(e))
@@ -245,8 +245,6 @@ class Purge:
     def delete_quotas(self):
         # (Quotas should return to defaults if there were any)
         # self.cinder.quotas.delete(self.tenant_id)
-
-        # NOTE: The following is a temporary fix until we upgrade from havana
 
         # Get the default quotas
         defaults = self.cinder.quota_defaults()
