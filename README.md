@@ -1,8 +1,6 @@
 
 #Lunr 
 
-Status: [![Build Status](https://travis-ci.org/audip/lunr.svg?branch=feature%2Ffeedreader)](https://travis-ci.org/audip/lunr)
-
 Lunr plans to be an OpenStack compatible volume manager.
 
 ##Geting started
