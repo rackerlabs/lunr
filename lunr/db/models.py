@@ -27,7 +27,7 @@ from sqlalchemy.orm.interfaces import MapperExtension
 from sqlalchemy.orm.session import Session
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.schema import MetaData, UniqueConstraint
-
+from sqlalchemy import create_engine, Column, String, Integer, DateTime
 from uuidimpl import UUID
 from jsonimpl import FrozenDict, JsonEncodedDict
 
@@ -333,6 +333,63 @@ class VolumeType(ModelBase):
         return "<VolumeType %s: %s %s?>" % (
             self.ed, repr(self.name), self.status)
 
+
+@DateFields
+class Event(ModelBase):
+    __tablename__ = 'events'
+    __table_args__ = ({
+        'mysql_engine': 'InnoDB',
+        'mysql_charset': 'utf8',
+    })
+    __immutable_columns__ = ['id']
+
+    id = Column(Integer, primary_key=True, nullable=False)
+    event_id = Column(String(45), unique=True, nullable=False)
+    tenant_id = Column(String(20), index=True, nullable=False)
+    timestamp = Column(DateTime, nullable=False)
+    processed = Column(String(5), nullable=False)
+    last_purged = Column(DateTime, nullable=True)
+
+
+@DateFields
+class Error(ModelBase):
+    __tablename__ = 'error'
+    __table_args__ = ({
+        'mysql_engine': 'InnoDB',
+        'mysql_charset': 'utf8',
+    })
+    __immutable_columns__ = ['id']
+
+    id = Column(Integer, primary_key=True, nullable=False)
+    event_id = Column(String(50), nullable=True)
+    tenant_id = Column(String(20), nullable=True)
+    type = Column(String(15), nullable=False)
+    message = Column(String(200), unique=True, nullable=False)
+
+    def __init__(self, **kwargs):
+        ModelBase.__init__(self, **kwargs)
+
+    def __repr__(self):
+        return "<Error %s: %s %s %s>" % (self.event_id, self.tenant_id, self.type, self.message)
+
+
+@DateFields
+class Marker(ModelBase):
+    __tablename__ = 'marker'
+    __table_args__ = ({
+        'mysql_engine': 'InnoDB',
+        'mysql_charset': 'utf8',
+    })
+    __immutable_columns__ = ['id']
+
+    id = Column(Integer, primary_key=True, nullable=False)
+    last_marker = Column(String(45))
+
+    def __init__(self, last_marker):
+        self.last_marker = last_marker
+
+    def __repr__(self):
+        return "<Marker %s: %s >" % (self.last_marker, self.marker_timestamp)
 
 if __name__ == "__main__":
     from lunr.db.console import main

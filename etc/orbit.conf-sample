@@ -43,6 +43,14 @@ span = hours=1
 #interval = seconds=10
 #span = hours=1
 
+[terminator]
+# uncomment to override defaults in section [terminator]
+# interval = seconds=10
+# span = hours=1
+# lunr_url=http://localhost:8080
+# debug=false
+# feed_url=http://localhost:5000/customer_access_policy/events
+
 [detach]
 # How often the 'detach' jobs will be run
 interval = seconds=5
