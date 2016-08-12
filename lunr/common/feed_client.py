@@ -40,19 +40,18 @@ class GetPageFailed(FeedError):
 class Feed(object):
     """ Feed reader to fetch terminated events from cloud feeds """
     def __init__(self, conf, logger, feed_url, auth_token,
-                 etag=None, read_forward=True, last_event=None, limit=50):
+                 etag=None, read_forward=True, last_event=None):
 
         self.logger = logger
-        self.feed_url = feed_url or conf.string('terminator', 'feed_url', 'none')
-        self.timeout = int(conf.string('cloudfeedsclient', 'timeout', 10))
+        self.feed_url = feed_url or conf.string('feed-reader', 'feed_url', 'none')
+        self.timeout = int(conf.string('feed-reader', 'timeout', 10))
         self.auth_token = auth_token
         self.etag = etag
         self.new_etag = None
         self.processed_events = []
         self.last_event = last_event
         self.read_forward = read_forward
-        self.feed_limit = conf.int('cloudfeedsclient', 'feed_limit', 25)
-        self.event_limit = limit
+        self.event_limit = conf.int('feed-reader', 'feed_limit', 100)
 
     def get(self, url, **kwargs):
     """ GET request for url """
@@ -106,7 +105,7 @@ class Feed(object):
         if self.read_forward:
             if self.last_event:
                 url = '%s?marker=urn:uuid:%s&' % (url, self.last_event) + \
-                      'direction=forward&limit=%s' % self.feed_limit
+                      'direction=forward&limit=%s' % self.event_limit
             else:
                 url = '%s?marker=last' % (url)
         page = self.get_page(url)

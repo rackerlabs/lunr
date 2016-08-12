@@ -43,8 +43,8 @@ class BadRequest(PurgeError):
 class Purge(object):
 
     def __init__(self, tenant_id, conf):
-        self.lunr_url = conf.string('terminator', 'lunr_url', 'http://localhost:8080')
-        self.debug = conf.bool('terminator', 'debug', 'false')
+        self.lunr_url = conf.string('purge-accounts', 'lunr_url', 'http://localhost:8080')
+        self.debug = conf.bool('purge-accounts', 'debug', 'false')
         self.admin_tenant_id = conf.string('cinder', 'admin_tenant_id', None)
         self.config = conf
         self.lunr = LunrClient(tenant_id, timeout=10, url=self.lunr_url,

@@ -96,7 +96,8 @@ class TerminatedFeedReader(CronJob):
 
     def fetch_feed(self):  # pragma: no cover
         """ Return feed from cloud feeds, using cloud feed client """
-        return cloudfeedclient.Feed(self.config, console_logger, self.url, self.auth_token, last_event=self.marker, limit=50)
+        return cloudfeedclient.Feed(self.config, console_logger, self.url,
+				    self.auth_token, last_event=self.marker)
 
     def fetch_events(self):
         """ Authenticate with Identity and fetch new events from cloud feeds """
