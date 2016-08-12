@@ -23,6 +23,7 @@ from sqlalchemy import and_,or_
 
 import time
 import datetime
+import collections
 
 log = logger.get_logger('orbit.purgeaccounts')
 
@@ -42,7 +43,7 @@ class PurgeAccounts(CronJob):
             'backups': 0,
             'backup-size': 0,
             'volumes': 0,
-            'vtypes': {}
+            'vtypes': collections.defaultdict(int)
         }
         self.options = {'throttle': 1, 'verbose': True}
 
@@ -107,10 +108,7 @@ class PurgeAccounts(CronJob):
         self.total['backups'] += purger.total['backups']
         self.total['backup-size'] += purger.total['backup-size']
         for key in purger.total['vtypes'].keys():
-            try:
-                self.total['vtypes'][key] += purger.total['vtypes'][key]
-            except KeyError:
-                self.total['vtypes'][key] = purger.total['vtypes'][key]
+            self.total['vtypes'][key] += purger.total['vtypes'][key]
 
     def run_purge(self, tenant_id):
     """ Implements the Purger on terminated account"""

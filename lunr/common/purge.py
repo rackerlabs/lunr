@@ -19,6 +19,7 @@ from lunr.common.exc import ClientException
 from lunr.cinder.cinderclient import CinderClient
 from lunr.common import logger
 from lunrclient.base import LunrError, LunrHttpError
+import collections
 import time
 
 log = logger.get_logger('orbit.purge')
@@ -57,7 +58,7 @@ class Purge(object):
             'backups': 0,
             'backup-size': 0,
             'volumes': 0,
-            'vtypes': {}
+            'vtypes': collections.defaultdict(int)
         }
 
     def log(self, msg):
@@ -201,10 +202,7 @@ class Purge(object):
 
     def incr_volume(self, volume):
         self.total['volumes'] += 1
-        try:
-            self.total['vtypes'][volume['volume_type_name']] += volume['size']
-        except KeyError:
-            self.total['vtypes'][volume['volume_type_name']] = volume['size']
+        self.total['vtypes'][volume['volume_type_name']] += volume['size']
 
     def incr_backup(self, backup):
         self.total['backups'] += 1
