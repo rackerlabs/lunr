@@ -17,10 +17,10 @@ import unittest
 from collections import defaultdict
 
 from lunr.common.config import LunrConfig
-from lunr.db.models import Error, Event, Marker, Audit
+from lunr.db.models import Error, Event, Marker
 from lunr import db
-import lunr.orbit.jobs.purgeaccounts
-from lunr.orbit.jobs.purgeaccounts import PurgeAccounts
+import lunr.orbit.jobs.purge_accounts
+from lunr.orbit.jobs.purge_accounts import PurgeAccounts
 from testlunr.unit import patch
 
 
@@ -82,12 +82,12 @@ class TestPurgeAccounts(unittest.TestCase):
 
             def purge(self):
                 return True
-        original_purge = lunr.orbit.jobs.purgeaccounts.Purge
-        lunr.orbit.jobs.purgeaccounts.Purge = FakePurge
+        original_purge = lunr.orbit.jobs.purge_accounts.Purge
+        lunr.orbit.jobs.purge_accounts.Purge = FakePurge
         try:
             result = self.reader.run_purge("123")
         finally:
-            lunr.orbit.jobs.purgeaccounts.Purge = original_purge
+            lunr.orbit.jobs.purge_accounts.Purge = original_purge
 
         self.assertTrue(result)
 
@@ -100,12 +100,12 @@ class TestPurgeAccounts(unittest.TestCase):
 
             def purge(self):
                 return False
-        original_purge = lunr.orbit.jobs.purgeaccounts.Purge
-        lunr.orbit.jobs.purgeaccounts.Purge = FakePurge
+        original_purge = lunr.orbit.jobs.purge_accounts.Purge
+        lunr.orbit.jobs.purge_accounts.Purge = FakePurge
         try:
             result = self.reader.run_purge("123")
         finally:
-            lunr.orbit.jobs.purgeaccounts.Purge = original_purge
+            lunr.orbit.jobs.purge_accounts.Purge = original_purge
 
         self.assertFalse(result)
 

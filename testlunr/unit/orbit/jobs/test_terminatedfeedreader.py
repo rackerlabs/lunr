@@ -17,9 +17,9 @@ import unittest
 
 from lunr.common.config import LunrConfig
 from lunr.db.models import Error, Event, Marker
-from lunr.common import cloudfeedclient
+from lunr.common import feed_client
 from lunr import db
-from lunr.orbit.jobs.terminatedfeedreader import TerminatedFeedReader
+from lunr.orbit.jobs.feed_reader import TerminatedFeedReader
 from testlunr.unit import patch
 
 
@@ -102,7 +102,7 @@ class TestTerminatedFeedReader(unittest.TestCase):
 
         # Mock feed server request
         def fetch_feed():
-            return cloudfeedclient.Feed(self.conf, self.log,
+            return feed_client.Feed(self.conf, self.log,
                                         "http://no-host.com", "fake-token")
 
         with patch(self.reader, 'fetch_token', fetch_token):

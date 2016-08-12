@@ -99,19 +99,20 @@ class PurgeAccounts(CronJob):
         self.print_totals()
 
     def print_totals(self):  # pragma: no cover
-    """ Logs the total accounts proccessed in a run """
+        """ Logs the total accounts proccessed in a run """
         log.info("Grand Total - %s " % self.total)
 
     def collect_totals(self, purger):
-    """ Save purging information for logging """
+        """ Save purging information for logging """
         self.total['volumes'] += purger.total['volumes']
         self.total['backups'] += purger.total['backups']
         self.total['backup-size'] += purger.total['backup-size']
+        print(repr(purger.total['vtypes']))
         for key in purger.total['vtypes'].keys():
             self.total['vtypes'][key] += purger.total['vtypes'][key]
 
     def run_purge(self, tenant_id):
-    """ Implements the Purger on terminated account"""
+        """ Implements the Purger on terminated account"""
         found = False
         purger = None
 
