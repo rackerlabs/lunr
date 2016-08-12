@@ -38,6 +38,7 @@ class GetPageFailed(FeedError):
 
 
 class Feed(object):
+    """ Feed reader to fetch terminated events from cloud feeds """
     def __init__(self, conf, logger, feed_url, auth_token,
                  etag=None, read_forward=True, last_event=None, limit=50):
 
@@ -54,9 +55,11 @@ class Feed(object):
         self.event_limit = limit
 
     def get(self, url, **kwargs):
+    """ GET request for url """
         return self.request(url, method='GET', **kwargs)
 
     def request(self, url, method, **kwargs):
+    """ Requests connection with headers """
         headers = {'X-Auth-Token': self.auth_token}
         req = Request(url, data=urlencode(kwargs), headers=headers)
         req.get_method = lambda *args, **kwargs: method
@@ -67,6 +70,7 @@ class Feed(object):
             raise HTTPClientError(req, e)
 
     def get_page(self, feed_url):
+    """ Gets a page from cloud feeds """
         # GET the feed
         resp = self.get(feed_url)
         # If returned non 200 class response code
@@ -90,12 +94,14 @@ class Feed(object):
         return minidom.parseString(content)
 
     def compare_etag(self, resp):
+    """ Compares etag to check for new events on cloud feed """
         if self.new_etag is None:
             self.new_etag = resp.info().getheader('etag')
             if self.new_etag and self.new_etag == self.etag:
                 raise FeedUnchanged()
 
     def get_pages(self):
+    """ Gets pages for given marker """
         url = self.feed_url
         if self.read_forward:
             if self.last_event:
@@ -133,12 +139,14 @@ class Feed(object):
 
     @staticmethod
     def get_attributes(element):
+    """ Fetches attributes for XML event """
         data = dict()
         for attr in element.attributes.keys():
             data[attr] = element.getAttribute(attr)
         return data
 
     def get_events(self):
+    """ Return events from a given marker"""
         event_count = 0
         for page in self.get_pages():
             events = list()
@@ -159,6 +167,7 @@ class Feed(object):
                 yield event
 
     def get_url(self, page, url_key):
+    """ Gets URL corresponding to page """
         if page:
             for link in self.get_children(page, 'link'):
                 if link.getAttribute('rel') == url_key:

@@ -28,8 +28,9 @@ log = logger.get_logger('orbit.purgeaccounts')
 
 
 class PurgeAccounts(CronJob):
+    """ Orbit Job that takes events from database as input and processes purging of accounts"""
 
-    def __init__(self, conf, session):
+    def __init__(self, conf, session):  # pragma: no cover
         CronJob.__init__(self)
         self.config = conf
         self.session = session
@@ -71,7 +72,8 @@ class PurgeAccounts(CronJob):
         except PurgeError as e:
             self.log_error_to_db(e)
 
-    def run(self):
+    def run(self):  # pragma: no cover
+        """ Implments the CRON run method """
 
         account_counter = 0
         # Iterate over the list of deletable accounts
@@ -96,9 +98,11 @@ class PurgeAccounts(CronJob):
         self.print_totals()
 
     def print_totals(self):  # pragma: no cover
+    """ Logs the total accounts proccessed in a run """
         log.info("Grand Total - %s " % self.total)
 
     def collect_totals(self, purger):
+    """ Save purging information for logging """
         self.total['volumes'] += purger.total['volumes']
         self.total['backups'] += purger.total['backups']
         self.total['backup-size'] += purger.total['backup-size']
@@ -109,6 +113,7 @@ class PurgeAccounts(CronJob):
                 self.total['vtypes'][key] = purger.total['vtypes'][key]
 
     def run_purge(self, tenant_id):
+    """ Implements the Purger on terminated account"""
         found = False
         purger = None
 
@@ -131,6 +136,7 @@ class PurgeAccounts(CronJob):
             log.debug("Purge of '%s' Completed Successfully" % tenant_id)
 
     def fetch_events(self):
+        """ Fetches events not proccessed or retries stuck account """
         time_delta = datetime.datetime.utcnow() - datetime.timedelta(seconds=self.delta)
         events = self.session.query(Event).\
             filter(and_(Event.processed == 'No',
@@ -139,6 +145,7 @@ class PurgeAccounts(CronJob):
         return events
 
     def save_processed_event(self, event):
+        """ Marks purged account as processed """
         event.last_purged = datetime.datetime.utcnow()
         event.processed = 'Yes'
         self.session.add(event)

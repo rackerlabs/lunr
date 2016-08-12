@@ -40,7 +40,7 @@ class BadRequest(PurgeError):
     pass
 
 
-class Purge:
+class Purge(object):
 
     def __init__(self, tenant_id, conf):
         self.lunr_url = conf.string('terminator', 'lunr_url', 'http://localhost:8080')
@@ -101,7 +101,7 @@ class Purge:
             raise FailContinue("Snapshot '%s' never changed to status of "
                                "'deleted'" % backup['id'])
         except NotFound:
-            log.debug("Delete %s Success" % backup['id'])
+            self.log("Delete %s Success" % backup['id'])
             return True
 
     def is_volume_connected(self, volume):
@@ -169,14 +169,9 @@ class Purge:
 
     def _delete_volume(self, volume):
         # Skip volumes in strange status
-        if volume['status'] in ('NEW', 'DELETED'):
+        if volume['status'] in ('NEW', 'DELETED', 'ERROR', 'DELETING'):
             self.debug("SKIP - Volume %s in status of %s"
                        % (volume['id'], volume['status']))
-            return False
-
-        if volume['status'] in ('ERROR', 'DELETING'):
-            self.log("SKIP - Volume %s in status of %s"
-                     % (volume['id'], volume['status']))
             return False
 
         # Catch statuses we may have missed
