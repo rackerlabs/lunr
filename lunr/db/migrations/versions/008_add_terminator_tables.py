@@ -23,6 +23,7 @@ table_kwargs = {
     'mysql_charset': 'utf8',
 }
 
+# Table for logging currently active errors
 error = Table(
     'error', meta,
     Column('id', Integer, primary_key=True, nullable=False),
@@ -34,6 +35,8 @@ error = Table(
     Column('last_modified', DateTime),
     **table_kwargs
 )
+
+# Table that holds current marker of event fetched from cloud feeds
 marker = Table(
     'marker', meta,
     Column('id', Integer, primary_key=True, nullable=False),
@@ -42,6 +45,8 @@ marker = Table(
     Column('last_modified', DateTime),
     **table_kwargs
 )
+
+# Table for saving events from cloud feeds, processed flag, last purge attempt info
 events = Table(
     'events', meta,
     Column('id', Integer, primary_key=True, nullable=False),
