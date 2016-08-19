@@ -108,8 +108,8 @@ class PurgeAccounts(CronJob):
         self.total['backups'] += purger.total['backups']
         self.total['backup-size'] += purger.total['backup-size']
         print(repr(purger.total['vtypes']))
-        for key in purger.total['vtypes'].keys():
-            self.total['vtypes'][key] += purger.total['vtypes'][key]
+        # for key in purger.total['vtypes'].keys():
+        #    self.total['vtypes'][key] += # purger.total['vtypes'][key]
 
     def run_purge(self, tenant_id):
         """ Implements the Purger on terminated account"""
@@ -149,4 +149,3 @@ class PurgeAccounts(CronJob):
         event.processed = 'Yes'
         self.session.add(event)
         self.session.commit()
-

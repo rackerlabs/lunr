@@ -19,7 +19,7 @@ from lunr.common.config import LunrConfig
 from lunr.db.models import Error, Event, Marker
 from lunr.common import feed_client
 from lunr import db
-from lunr.orbit.jobs.feed_reader import TerminatedFeedReader
+from lunr.orbit.jobs.feed_reader import FeedReader
 from testlunr.unit import patch
 
 
@@ -33,13 +33,13 @@ class MockLog(object):
         self.msg = msg
 
 
-class TestTerminatedFeedReader(unittest.TestCase):
+class TestFeedReader(unittest.TestCase):
     def setUp(self):
         self.conf = LunrConfig({'db': {'auto_create': True,
                                        'url': 'sqlite://'}})
         self.sess = db.configure(self.conf)
         self.log = MockLog()
-        self.reader = TerminatedFeedReader(self.conf, self.sess)
+        self.reader = FeedReader(self.conf, self.sess)
 
     # def test_run(self):
     #    self.reader.run()
@@ -70,7 +70,7 @@ class TestTerminatedFeedReader(unittest.TestCase):
         self.assertEqual(obj, None)
 
     def test_save_event(self):
-        mock_event = {'id': '123', 'tenantId': '456'}
+        mock_event = {'id': '123', 'tenantId': '456', 'eventTime': '2016-07-05T00:55:25.027Z'}
         self.reader.save_event(mock_event)
         self.sess.commit()
         obj = self.sess.query(Event).filter(Event.event_id == mock_event['id']).first()

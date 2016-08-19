@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import unittest
+import datetime
 from collections import defaultdict
 
 from lunr.common.config import LunrConfig
@@ -74,41 +75,6 @@ class TestPurgeAccounts(unittest.TestCase):
         obj = self.sess.query(Error).filter(Error.type == "test").first()
         self.assertEqual(obj, None)
 
-    def test_run_purge_success(self):
-        class FakePurge(object):
-            def __init__(self, tenant, config):
-                self.total = defaultdict(int)
-                pass
-
-            def purge(self):
-                return True
-        original_purge = lunr.orbit.jobs.purge_accounts.Purge
-        lunr.orbit.jobs.purge_accounts.Purge = FakePurge
-        try:
-            result = self.reader.run_purge("123")
-        finally:
-            lunr.orbit.jobs.purge_accounts.Purge = original_purge
-
-        self.assertTrue(result)
-
-
-    def test_run_purge_fail(self):
-        class FakePurge(object):
-            def __init__(self, tenant, config):
-                self.total = defaultdict(int)
-                pass
-
-            def purge(self):
-                return False
-        original_purge = lunr.orbit.jobs.purge_accounts.Purge
-        lunr.orbit.jobs.purge_accounts.Purge = FakePurge
-        try:
-            result = self.reader.run_purge("123")
-        finally:
-            lunr.orbit.jobs.purge_accounts.Purge = original_purge
-
-        self.assertFalse(result)
-
     def test_collect_totals(self):
         pass
 
@@ -116,15 +82,17 @@ class TestPurgeAccounts(unittest.TestCase):
         events = self.reader.fetch_events()
         self.assertIsNotNone(events)
 
-    def tests_save_to_audit(self):
-        mock_event = Event(tenant_id='1234', event_id='2345')
+    def tests_save_processed_event(self):
+        mock_event = Event(event_id='2345',
+        tenant_id='1234',
+        timestamp= datetime.datetime.utcnow(),
+        processed='No',
+        last_purged=None)
         self.sess.add(mock_event)
         self.sess.commit()
-        self.reader.save_to_audit(mock_event)
-        # fetch audit record
-        audited_record = self.sess.query(Audit).filter(Audit.event_id == mock_event.event_id).first()
-        self.assertEquals(audited_record.event_id, mock_event.event_id)
-        self.assertEquals(audited_record.tenant_id, mock_event.tenant_id)
-        # check for deleted event
-        empty_event = self.sess.query(Event).filter(Event.event_id == mock_event.event_id).first()
-        self.assertIsNone(empty_event)
+        self.reader.save_processed_event(mock_event)
+        # fetch processed record
+        processed_record = self.sess.query(Event).filter(Event.event_id == mock_event.event_id).first()
+        self.assertEquals(processed_record.event_id, mock_event.event_id)
+        self.assertEquals(processed_record.processed, 'Yes')
+        self.assertIsNotNone(processed_record.last_purged)

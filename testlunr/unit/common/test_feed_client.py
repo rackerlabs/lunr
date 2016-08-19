@@ -14,7 +14,7 @@
 # limitations under the License.
 import os
 import unittest
-from lunr.common import cloudfeedclient
+from lunr.common import feed_client
 from lunr.common.config import LunrConfig
 from testlunr.unit import patch
 
@@ -49,7 +49,7 @@ class TestBackupSuspects(unittest.TestCase):
         self.feed = cloudfeedclient.Feed(self.conf, self.log,
                                          "http://no-host.com", "fake-token")
         self.test_file = os.path.join(os.path.dirname(__file__),
-                                      'test_cloudfeedclient.xml')
+                                      'test_feed_client.xml')
 
     def test_get_events_200(self):
         def urlopen(request, **kwargs):

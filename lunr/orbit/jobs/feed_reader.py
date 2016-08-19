@@ -16,8 +16,8 @@
 from __future__ import print_function
 
 from lunr.orbit import CronJob
-from lunr.common import logger, cloudfeedclient
-from lunr.common.cloudfeedclient import FeedError
+from lunr.common import logger, feed_client
+from lunr.common.feed_client import FeedError
 from lunr.cinder.cinderclient import CinderError
 from lunr.cinder import cinderclient
 import sqlalchemy.exc
@@ -39,7 +39,7 @@ class DBError(Exception):  # pragma: no cover
     pass
 
 
-class TerminatedFeedReader(CronJob):
+class FeedReader(CronJob):
     """ Orbit Job to read terminated events from cloud feeds and save them in to the lunr MySQL database. """
 
     def __init__(self, conf, session):  # pragma: no cover
