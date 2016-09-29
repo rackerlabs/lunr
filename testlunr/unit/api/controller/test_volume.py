@@ -14,6 +14,7 @@
 # limitations under the License.
 
 
+import datetime
 import unittest
 import tempfile
 import os
@@ -531,6 +532,8 @@ class TestVolumeController(unittest.TestCase):
         res = c.delete(req)
         self.assertEqual(res.body['id'], id)
         self.assertEqual(res.body['status'], 'DELETING')
+        self.assert_(res.body['deleted_at'])
+        self.assertIsInstance(res.body['deleted_at'], datetime.datetime)
         c = Controller(
                 {
                     'account_id': self.account_id,

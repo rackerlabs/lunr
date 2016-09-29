@@ -14,6 +14,7 @@
 # limitations under the License.
 
 
+import datetime
 import random
 import re
 import urllib2
@@ -23,6 +24,7 @@ from webob.exc import HTTPPreconditionFailed, HTTPConflict, HTTPNotFound, \
 from webob import Response
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import and_, or_
+from sqlalchemy.sql import func
 
 from lunr.api.controller.base import BaseController, NodeError
 from lunr.common import logger
@@ -280,7 +282,8 @@ class VolumeController(BaseController):
 
         Delete volume
         """
-        update_params = {'status': 'DELETING', 'restore_of': None}
+        update_params = {'status': 'DELETING', 'restore_of': None,
+                         'deleted_at': datetime.datetime.now()}
         num_updated = self.account_query(Volume).filter_by(id=self.id).\
             update(update_params)
         if not num_updated:
