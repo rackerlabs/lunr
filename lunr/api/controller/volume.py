@@ -24,7 +24,6 @@ from webob.exc import HTTPPreconditionFailed, HTTPConflict, HTTPNotFound, \
 from webob import Response
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import and_, or_
-from sqlalchemy.sql import func
 
 from lunr.api.controller.base import BaseController, NodeError
 from lunr.common import logger
