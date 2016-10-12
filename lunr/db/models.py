@@ -216,6 +216,7 @@ class Volume(ModelBase):
     restore_of = Column(String(36), nullable=True)
     image_id = Column(String(36), nullable=True)
     name = Column(String(255), nullable=True)
+    deleted_at = Column(DateTime, nullable=True)
 
     def __init__(self, size=0, volume_type_name=DEFAULT_VOLUME_TYPE, **kwargs):
         if 'id' not in kwargs:
