@@ -27,7 +27,7 @@ from sqlalchemy.orm.interfaces import MapperExtension
 from sqlalchemy.orm.session import Session
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.schema import MetaData, UniqueConstraint
-
+from sqlalchemy import create_engine, Column, String, Integer, DateTime
 from uuidimpl import UUID
 from jsonimpl import FrozenDict, JsonEncodedDict
 
@@ -68,6 +68,10 @@ class NodeExtension(MapperExtension):
         instance._storage_used = None
 
 
+def time_parser(timestamp):
+    return datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S.%fZ')
+
+
 def DateFields(cls):
     cls.created_at = Column(DateTime, default=func.now())
     cls.last_modified = Column(DateTime, default=func.now(),
@@ -102,6 +106,7 @@ class Node(ModelBase):
     storage_port = Column(Integer, default=3260, nullable=False)
     cinder_host = Column(String(255), nullable=False)
     affinity_group = Column(String(255), nullable=False, default='')
+    zone = Column(String(255), nullable=False, default='')
 
     @property
     def _meta(self):
@@ -334,6 +339,86 @@ class VolumeType(ModelBase):
         return "<VolumeType %s: %s %s?>" % (
             self.ed, repr(self.name), self.status)
 
+
+@DateFields
+class Event(ModelBase):
+    __tablename__ = 'events'
+    __table_args__ = ({
+        'mysql_engine': 'InnoDB',
+        'mysql_charset': 'utf8',
+    })
+    __immutable_columns__ = ['id']
+
+    id = Column(Integer, primary_key=True, nullable=False)
+    event_id = Column(String(45), unique=True, nullable=False)
+    tenant_id = Column(String(20), index=True, nullable=False)
+
+
+@DateFields
+class Audit(ModelBase):
+    __tablename__ = 'audit'
+    __table_args__ = ({
+        'mysql_engine': 'InnoDB',
+        'mysql_charset': 'utf8',
+    })
+    __immutable_columns__ = ['id']
+
+    id = Column(Integer, primary_key=True, nullable=False)
+    event_id = Column(String(50), index=True, nullable=False)
+    tenant_id = Column(String(20), index=True, nullable=False)
+    type = Column(String(15), nullable=False)
+
+    def __init__(self, raw_event):
+        self.event_id = raw_event['id']
+        self.tenant_id = raw_event['tenantId']
+
+
+@DateFields
+class Error(ModelBase):
+    __tablename__ = 'error'
+    __table_args__ = ({
+        'mysql_engine': 'InnoDB',
+        'mysql_charset': 'utf8',
+    })
+    __immutable_columns__ = ['id']
+
+    id = Column(Integer, primary_key=True, nullable=False)
+    event_id = Column(String(50), nullable=True)
+    tenant_id = Column(String(20), nullable=True)
+    type = Column(String(15), nullable=False)
+    message = Column(String(200), unique=True, nullable=False)
+
+    def __init__(self, **kwargs):
+        ModelBase.__init__(self, **kwargs)
+
+    def __repr__(self):
+        return "<Error %s: %s %s %s>" % (self.event_id, self.tenant_id, self.type, self.message)
+
+
+@DateFields
+class Marker(ModelBase):
+    __tablename__ = 'marker'
+    __table_args__ = ({
+        'mysql_engine': 'InnoDB',
+        'mysql_charset': 'utf8',
+    })
+    __immutable_columns__ = ['id']
+
+    id = Column(Integer, primary_key=True, nullable=False)
+    last_marker = Column(String(45))
+
+    def __init__(self, last_marker):
+        self.last_marker = last_marker
+
+    def __repr__(self):
+        return "<Marker %s: %s >" % (self.last_marker, self.marker_timestamp)
+
+
+#def setup_tables():
+#    url = "mysql+mysqldb://root:@192.168.14.4/lunr"
+    # engine = create_engine(url, echo=True, pool_recycle=3600)
+#    engine = create_engine(url, pool_recycle=3600)
+#    ModelBase.metadata.create_all(engine)
 
 if __name__ == "__main__":
     from lunr.db.console import main

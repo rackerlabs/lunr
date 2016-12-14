@@ -225,6 +225,7 @@ class VolumeController(BaseController):
         size = self._validate_size(request.params, volume_type, backup, source)
         affinity = self._validate_affinity(request.params)
         force_node = self._validate_force_node(request.params)
+        zone = request.params.get('zone')
         image_id = request.params.get('image_id')
         status = 'NEW'
         imaging = False
@@ -237,7 +238,8 @@ class VolumeController(BaseController):
         nodes = self.get_recommended_nodes(volume_type.name, size,
                                            imaging=imaging,
                                            affinity=affinity,
-                                           force_node=force_node)
+                                           force_node=force_node,
+                                           zone=zone)
 
         volume = Volume(id=self.id, account_id=self.account_id, status=status,
                         volume_type=volume_type, size=size, image_id=image_id,
