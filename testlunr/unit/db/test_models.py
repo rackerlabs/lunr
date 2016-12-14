@@ -59,6 +59,7 @@ class TestNode(ModelTest):
             'storage_port': 3260,
             'volume_type_name': models.DEFAULT_VOLUME_TYPE,
             'affinity_group': '',
+            'zone': '',
         }
         for k, v in expected.items():
             err_msg = '%s != %s (%s)' % (v, getattr(n, k), k)

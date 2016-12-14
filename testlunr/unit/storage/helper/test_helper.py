@@ -613,6 +613,7 @@ class TestHelper(BaseHelper):
                 'size': '9',
                 'cinder_host': '127.0.0.1',
                 'affinity_group': '',
+                'zone': '',
             }
             self.assertEquals(data, expected)
             return 200, expected

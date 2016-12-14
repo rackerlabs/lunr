@@ -1,0 +1,92 @@
+<feed xmlns="http://www.w3.org/2005/Atom">
+    <link href="http://localhost:4999/customer_access_policy/events/" rel="current" />
+    <link href="http://localhost:4999/customer_access_policy/events/?marker=last&amp;limit=25&amp;direction=forward" rel="self" />
+    <id>urn:uuid:f7f77fd8-1bed-484e-bcb2-d57210906f8f</id>
+    <title>customer_access_policy/events</title>
+    <updated>2016-07-14T20:42:32.092Z</updated>
+    <entry>
+        <atom:id xmlns:atom="http://www.w3.org/2005/Atom">urn:uuid:4db1af5d-1eb0-44d9-a2b6-8051891e482f</atom:id>
+        <atom:category term="tid:405419" xmlns:atom="http://www.w3.org/2005/Atom" />
+        <atom:category term="rgn:GLOBAL" xmlns:atom="http://www.w3.org/2005/Atom" />
+        <atom:category term="dc:GLOBAL" xmlns:atom="http://www.w3.org/2005/Atom" />
+        <atom:category term="customerservice.access_policy.info" xmlns:atom="http://www.w3.org/2005/Atom" />
+        <atom:category term="type:customerservice.access_policy.info" xmlns:atom="http://www.w3.org/2005/Atom" />
+        <title type="text">CustomerService</title>
+        <content>
+            <event dataCenter="GLOBAL" environment="PROD" eventTime="2015-05-05T00:55:27.031Z" id="4db1af5d-1eb0-44d9-a2b6-8051891e482f" region="GLOBAL" tenantId="405419" type="INFO" version="2" xmlns="http://docs.rackspace.com/core/event" xmlns:ns2="http://docs.rackspace.com/event/customer/access_policy">
+                <ns2:product previousEvent="" serviceCode="CustomerService" status="SUSPENDED" version="1" />
+            </event>
+        </content>
+        <link href="http://localhost:4999/customer_access_policy/events/entries/urn:uuid:4db1af5d-1eb0-44d9-a2b6-8051891e482f" rel="self" />
+        <updated>2015-05-05T05:55:27.317Z</updated>
+        <published>2015-05-05T05:55:27.317Z</published>
+    </entry>
+    <entry>
+        <atom:id xmlns:atom="http://www.w3.org/2005/Atom">urn:uuid:cafb1344-3bb3-4466-8053-6f29f031eec9</atom:id>
+        <atom:category term="tid:5953419" xmlns:atom="http://www.w3.org/2005/Atom" />
+        <atom:category term="rgn:GLOBAL" xmlns:atom="http://www.w3.org/2005/Atom" />
+        <atom:category term="dc:GLOBAL" xmlns:atom="http://www.w3.org/2005/Atom" />
+        <atom:category term="customerservice.access_policy.info" xmlns:atom="http://www.w3.org/2005/Atom" />
+        <atom:category term="type:customerservice.access_policy.info" xmlns:atom="http://www.w3.org/2005/Atom" />
+        <title type="text">CustomerService</title>
+        <content>
+            <event dataCenter="GLOBAL" environment="PROD" eventTime="2015-05-05T00:55:27.030Z" id="cafb1344-3bb3-4466-8053-6f29f031eec9" region="GLOBAL" tenantId="5953419" type="INFO" version="2" xmlns="http://docs.rackspace.com/core/event" xmlns:ns2="http://docs.rackspace.com/event/customer/access_policy">
+                <ns2:product previousEvent="" serviceCode="CustomerService" status="FULL" version="1" />
+            </event>
+        </content>
+        <link href="http://localhost:4999/customer_access_policy/events/entries/urn:uuid:cafb1344-3bb3-4466-8053-6f29f031eec9" rel="self" />
+        <updated>2015-05-05T05:55:26.833Z</updated>
+        <published>2015-05-05T05:55:26.833Z</published>
+    </entry>
+    <entry>
+        <atom:id xmlns:atom="http://www.w3.org/2005/Atom">urn:uuid:468d805a-be1d-4ce5-8aff-8f9d394cf6e3</atom:id>
+        <atom:category term="tid:357146" xmlns:atom="http://www.w3.org/2005/Atom" />
+        <atom:category term="rgn:GLOBAL" xmlns:atom="http://www.w3.org/2005/Atom" />
+        <atom:category term="dc:GLOBAL" xmlns:atom="http://www.w3.org/2005/Atom" />
+        <atom:category term="customerservice.access_policy.info" xmlns:atom="http://www.w3.org/2005/Atom" />
+        <atom:category term="type:customerservice.access_policy.info" xmlns:atom="http://www.w3.org/2005/Atom" />
+        <title type="text">CustomerService</title>
+        <content>
+            <event dataCenter="GLOBAL" environment="PROD" eventTime="2015-05-05T00:55:25.027Z" id="468d805a-be1d-4ce5-8aff-8f9d394cf6e3" region="GLOBAL" tenantId="357146" type="INFO" version="2" xmlns="http://docs.rackspace.com/core/event" xmlns:ns2="http://docs.rackspace.com/event/customer/access_policy">
+                <ns2:product previousEvent="" serviceCode="CustomerService" status="TERMINATED" version="1" />
+            </event>
+        </content>
+        <link href="http://localhost:4999/customer_access_policy/events/entries/urn:uuid:468d805a-be1d-4ce5-8aff-8f9d394cf6e3" rel="self" />
+        <updated>2015-05-05T05:55:25.490Z</updated>
+        <published>2015-05-05T05:55:25.490Z</published>
+    </entry>
+    <entry>
+        <atom:id xmlns:atom="http://www.w3.org/2005/Atom">urn:uuid:e61e1d6c-1737-41ce-a865-92252afbe529</atom:id>
+        <atom:category term="tid:398921" xmlns:atom="http://www.w3.org/2005/Atom" />
+        <atom:category term="rgn:GLOBAL" xmlns:atom="http://www.w3.org/2005/Atom" />
+        <atom:category term="dc:GLOBAL" xmlns:atom="http://www.w3.org/2005/Atom" />
+        <atom:category term="customerservice.access_policy.info" xmlns:atom="http://www.w3.org/2005/Atom" />
+        <atom:category term="type:customerservice.access_policy.info" xmlns:atom="http://www.w3.org/2005/Atom" />
+        <title type="text">CustomerService</title>
+        <content>
+            <event dataCenter="GLOBAL" environment="PROD" eventTime="2015-05-05T00:55:22.021Z" id="e61e1d6c-1737-41ce-a865-92252afbe529" region="GLOBAL" tenantId="398921" type="INFO" version="2" xmlns="http://docs.rackspace.com/core/event" xmlns:ns2="http://docs.rackspace.com/event/customer/access_policy">
+                <ns2:product previousEvent="" serviceCode="CustomerService" status="TERMINATED" version="1" />
+            </event>
+        </content>
+        <link href="http://localhost:4999/customer_access_policy/events/entries/urn:uuid:e61e1d6c-1737-41ce-a865-92252afbe529" rel="self" />
+        <updated>2015-05-05T05:55:22.540Z</updated>
+        <published>2015-05-05T05:55:22.540Z</published>
+    </entry>
+    <entry>
+        <atom:id xmlns:atom="http://www.w3.org/2005/Atom">urn:uuid:c677ffa5-2903-43c0-a69d-db931464e246</atom:id>
+        <atom:category term="tid:5953419" xmlns:atom="http://www.w3.org/2005/Atom" />
+        <atom:category term="rgn:GLOBAL" xmlns:atom="http://www.w3.org/2005/Atom" />
+        <atom:category term="dc:GLOBAL" xmlns:atom="http://www.w3.org/2005/Atom" />
+        <atom:category term="customerservice.access_policy.info" xmlns:atom="http://www.w3.org/2005/Atom" />
+        <atom:category term="type:customerservice.access_policy.info" xmlns:atom="http://www.w3.org/2005/Atom" />
+        <title type="text">CustomerService</title>
+        <content>
+            <event dataCenter="GLOBAL" environment="PROD" eventTime="2015-05-05T00:55:20.016Z" id="c677ffa5-2903-43c0-a69d-db931464e246" region="GLOBAL" tenantId="5953419" type="INFO" version="2" xmlns="http://docs.rackspace.com/core/event" xmlns:ns2="http://docs.rackspace.com/event/customer/access_policy">
+                <ns2:product previousEvent="" serviceCode="CustomerService" status="TERMINATED" version="1" />
+            </event>
+        </content>
+        <link href="http://localhost:4999/customer_access_policy/events/entries/urn:uuid:c677ffa5-2903-43c0-a69d-db931464e246" rel="self" />
+        <updated>2015-05-05T05:55:20.218Z</updated>
+        <published>2015-05-05T05:55:20.218Z</published>
+    </entry>
+</feed>
