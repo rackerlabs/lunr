@@ -661,6 +661,22 @@ class TestVolumeController(unittest.TestCase):
         nodes2.sort()
         self.assertEqual(nodes1, nodes2)
 
+    def test_get_recommended_nodes_weights(self):
+        c = Controller({'account_id':  self.account_id}, self.mock_app)
+        size = 1
+        count = 1
+        nodes = c.get_recommended_nodes(self.vtype.name, size, count)
+        # 2 is preferred since it's biggest
+        self.assertEqual(nodes[0].id, self.node2.id)
+        self.node0.weight = 202
+        self.node1.weight = 201
+        self.node2.weight = 200
+        self.db.add_all([self.node0, self.node1, self.node2])
+        self.db.commit()
+        # 0 is preferred due to weight
+        nodes = c.get_recommended_nodes(self.vtype.name, size, count)
+        self.assertEqual(nodes[0].id, self.node0.id)
+
     def test_get_recommended_ignores_deleted_volumes(self):
         c = Controller({'account_id':  self.account_id}, self.mock_app)
         vtype = db.models.VolumeType('something_else')
@@ -717,6 +733,37 @@ class TestVolumeController(unittest.TestCase):
         # node1/3 have 1 volume. 3 should be included because it's bigger.
         node_ids = [node.id for node in nodes]
         expected_ids = [self.node0.id, self.node2.id, n.id]
+        self.assertEqual(sorted(node_ids), sorted(expected_ids))
+
+    def test_recommend_nodes_ordered_by_volumes_with_weights(self):
+        c = Controller({'account_id':  self.account_id}, self.mock_app)
+        n = db.models.Node('node3', 13, volume_type=self.vtype,
+                           hostname='10.127.0.3', port=8083)
+        self.db.add(n)
+        self.db.add(db.models.Volume(1, 'vtype', node=self.node1,
+                                     account_id=self.account_id,
+                                     volume_type=self.vtype))
+        self.db.add(db.models.Volume(1, 'vtype', node=n,
+                                     account_id=self.account_id))
+        n.calc_storage_used()
+        self.db.commit()
+        nodes = c.get_recommended_nodes(self.vtype.name, 1)
+        # node0/2 have 0 volumes, they should be included.
+        # node1/3 have 1 volume. 3 should be included because it's bigger.
+        node_ids = [node.id for node in nodes]
+        expected_ids = [self.node0.id, self.node2.id, n.id]
+        self.assertEqual(sorted(node_ids), sorted(expected_ids))
+
+        # Weight should override these.
+        self.node1.weight = 200
+        self.node2.weight = 200
+        n.weight = 200
+        self.db.add_all([self.node1, self.node2, n])
+        self.db.commit
+        nodes = c.get_recommended_nodes(self.vtype.name, 1)
+        node_ids = [node.id for node in nodes]
+        # Due to weights, we should want 1, 2, and 3
+        expected_ids = [self.node1.id, self.node2.id, n.id]
         self.assertEqual(sorted(node_ids), sorted(expected_ids))
 
     def test_deep_recommended_nodes(self):

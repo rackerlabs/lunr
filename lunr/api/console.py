@@ -196,7 +196,7 @@ class NodeConsole(Console, Displayable):
         """ List all nodes """
         resp = self.request('/nodes')
         self.display(resp, ['id', 'name', 'status', 'volume_type_name',
-                     'hostname', 'storage_hostname'])
+                     'hostname', 'storage_hostname', 'weight'])
 
     @opt('id', help="id of the node")
     def get(self, id):
@@ -212,6 +212,7 @@ class NodeConsole(Console, Displayable):
     @opt('-s', '--size', required=True, help='size in GB')
     @opt('--status', default='PENDING',
          help="status of node (Default is 'PENDING'")
+    @opt('-w', '--weight', help='scheduler weight')
     @opt('name', help="name of the new node")
     def create(self, args):
         """ Create a new node """
@@ -229,6 +230,7 @@ class NodeConsole(Console, Displayable):
          help='type of storage (volume_type_name)')
     @opt('-s', '--size', help='size in GB')
     @opt('--status', help='status of node')
+    @opt('-w', '--weight', help='scheduler weight')
     @opt('id', help="id of the node to update")
     def update(self, id, args):
         """ Update a node """
