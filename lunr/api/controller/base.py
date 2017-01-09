@@ -133,6 +133,7 @@ class BaseController(object):
         if force_node:
             q = q.filter(or_(Node.name == force_node, Node.id == force_node))
 
+        q = q.order_by(desc(Node.weight))
         def sort(q):
             if type == 'deep_fill':
                 q = q.order_by(acct_vol_used)

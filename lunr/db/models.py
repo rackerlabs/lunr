@@ -102,6 +102,7 @@ class Node(ModelBase):
     storage_port = Column(Integer, default=3260, nullable=False)
     cinder_host = Column(String(255), nullable=False)
     affinity_group = Column(String(255), nullable=False, default='')
+    weight = Column(Integer, nullable=False, default=100)
 
     @property
     def _meta(self):
