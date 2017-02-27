@@ -95,10 +95,6 @@ tar_parser.add_option('-z')
 tar_parser.add_option('-x')
 tar_parser.add_option('-f')
 
-rm_parser = OptionParser('rm')
-rm_parser.add_option('-r')
-rm_parser.add_option('-f’)
-
 vhd_util_parser = OptionParser('vhd-util')
 vhd_util_parser.add_option('-n')
 vhd_util_parser.add_option('-s')
@@ -461,10 +457,6 @@ class MockProcess(object):
     def tar(self, options, args):
         sleep(0.001)
         return 'lets just ignore this.'
-
-    def rm(self, options, args):
-        sleep(0.001)
-        return 'removing file/directory'
 
     def vhd_util(self, options, args):
         return 'ignoring for now.'

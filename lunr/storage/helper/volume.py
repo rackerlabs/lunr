@@ -358,7 +358,8 @@ class VolumeHelper(object):
         tarball = os.path.join(path, 'image')
         op_start = time()
         execute('tar', '-C', path, '-zxf', tarball, sudo=False)
-        execute('rm', tarball, sudo=False)
+        if os.path.exists(tarball):
+            os.remove(tarball)
         duration = time() - op_start
         mbytes = image.size / 1024 / 1024
         uncompressed = 0
