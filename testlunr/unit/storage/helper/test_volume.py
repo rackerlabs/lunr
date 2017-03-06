@@ -628,6 +628,8 @@ class TestCopyImage(BaseHelper):
     def test_tarball_present(self):
         image = MockImage('unused_id', len(''), '', disk_format='')
         self.path = mkdtemp(dir='/tmp')
+        with open(os.path.join(self.path, 'image'),'w') as f:
+            pass
         self.helper.untar_image(self.path, image.head)
         self.assertFalse(os.path.exists(os.path.join(self.path, 'image')))
 
