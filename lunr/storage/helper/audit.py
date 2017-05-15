@@ -17,9 +17,12 @@
 from lunr.storage.helper.base import bytes_to_gibibytes
 from lunr.storage.helper.utils import execute
 from operator import itemgetter
+from lunr.common import logger
 import math
 import json
 import re
+
+log = logger.get_logger('storage.helper.audit')
 
 
 def request(helper, url, **kwargs):
@@ -85,7 +88,7 @@ def compare_lists(first, second, key='id'):
     return True
 
 
-def snapshots(helper):
+def snapshots(helper, verbose=False):
     """
     Report any lingering snapshots that are not still in use by an
     active clone or backup operation
@@ -95,8 +98,8 @@ def snapshots(helper):
                  if lv['origin'] != '']
     results = []
 
-    def msg(id, _msg):
-        results.append({'snapshot': id, 'msg': _msg})
+    def msg(snapshot, _msg, id):
+        results.append({'snapshot': snapshot, 'msg': _msg, 'id': id})
 
     # For each of the snapshots
     for snapshot in snapshots:
@@ -107,7 +110,11 @@ def snapshots(helper):
                              % snapshot['backup_id'])
             if volume['status'] != 'SAVING':
                 msg(volume['id'], "Lingering snapshot from Backup, API "
-                    "reports status is '%s'" % volume['status'])
+                    "reports status is '%s'" % volume['status'], 'backup_id')
+            else:
+                if verbose:
+                    log.info("'%s' is backup for '%s'" % (snapshot['id'],
+                                                          volume['id']))
             continue
 
         # Snapshot could be for a clone
@@ -117,7 +124,11 @@ def snapshots(helper):
                              % snapshot['clone_id'])
             if volume['status'] != 'CLONING':
                 msg(volume['id'], "Lingering snapshot from Clone, API "
-                    "reports status is '%s'" % volume['status'])
+                    "reports status is '%s'" % volume['status'], 'clone_id')
+            else:
+                if verbose:
+                    log.info("'%s' is clone for '%s'" % (snapshot['id'],
+                                                         volume['id']))
             continue
         msg(snapshots['id'],
             "Lingering snapshot that is neither Clone or Backup")
