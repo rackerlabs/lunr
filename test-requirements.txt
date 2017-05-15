@@ -1,0 +1,14 @@
+pytest>=2.9.2
+webob>=1.6.1
+
+# pytest plugins
+pytest-flake8>=0.5
+pytest-cov>=2.3.0
+
+# flake8 plugins
+pep8-naming>=0.4.1
+flake8-import-order>=0.8
+
+# Tox
+tox>=2.3.1
+tox-pyenv>=1.0.3
