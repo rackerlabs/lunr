@@ -43,6 +43,22 @@ span = hours=1
 #interval = seconds=10
 #span = hours=1
 
+[purge-accounts]
+# uncomment to override defaults in section [terminator]
+# lunr_url=http://localhost:8080
+# interval = seconds=10
+# span = hours=1
+# debug=false
+
+[feed-reader]
+# feed_url=http://localhost:5000/customer_access_policy/events
+# The number of events pulled per page
+# feed_limit = 100
+# Time out waiting on feed
+# timeout = 10
+# interval = seconds=10
+# span = hours=1
+
 [detach]
 # How often the 'detach' jobs will be run
 interval = seconds=5

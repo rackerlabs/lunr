@@ -15,4 +15,3 @@ Build documentation::
 	python setup.py build_sphinx
 
 and browse to doc/build/html/index.html
-
