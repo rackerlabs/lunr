@@ -326,6 +326,22 @@ class TestCreateFromImage(BaseHelper):
         self.assertEquals(lunr_cb.called, True)
         self.assertEquals(cinder_cb.called, True)
 
+    def test_create_from_image_too_big(self):
+        image_id = uuid4()
+        # >127 fails to convert
+        min_disk = 128
+
+        def glance_conn(conf, tenant_id, glance_urls=None):
+            image = MockImage(image_id, len('data'), 'data', min_disk=min_disk)
+            glance = MockImageGlance(image)
+            return glance
+        volume.get_glance_conn = glance_conn
+        h = volume.VolumeHelper(self.conf)
+        volume_id = uuid4()
+        self.assertRaises(InvalidImage, h.create, volume_id,
+                          image_id=image_id, lock=self.lock)
+        self.assertRaises(NotFound, h.get, volume_id)
+
     def test_create_from_nonactive_image(self):
         image_id = uuid4()
 

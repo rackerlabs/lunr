@@ -518,6 +518,8 @@ class VolumeHelper(object):
                 if status.upper() != 'ACTIVE':
                     raise InvalidImage("Non-active image status: %s" % status)
                 min_disk = getattr(image, 'min_disk', 0)
+                if min_disk > 127:
+                    raise InvalidImage("Image > 127GB: %s" % image_id)
                 if min_disk:
                     multiplier = self._get_scratch_multiplier(image)
                     convert_gbs = int(min_disk * multiplier)
