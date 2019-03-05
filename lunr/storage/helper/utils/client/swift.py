@@ -867,8 +867,7 @@ class Connection(object):
 
 
 def connect(conf):
-    auth_url = conf.string('swift', 'auth_url',
-                           'http://localhost:8082/auth/v1.0')
+    auth_url = conf.string('swift', 'auth_url',conf.swift_default_auth_url)
     user = conf.string('swift', 'user', 'test:tester')
     key = conf.string('swift', 'key', 'testing')
     region = conf.string('swift', 'region', 'USA')
