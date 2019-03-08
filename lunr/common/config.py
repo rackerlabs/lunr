@@ -147,6 +147,7 @@ class LunrConfig(Config):
     lunr_api_config = '/etc/lunr/api-server.conf'
     lunr_storage_config = '/etc/lunr/storage-server.conf'
     lunr_orbit_config = '/etc/lunr/orbit.conf'
+    swift_default_auth_url = 'http://localhost:8082/v2.0/tokens'
 
     def __init__(self, values=None):
         values = values or {}
