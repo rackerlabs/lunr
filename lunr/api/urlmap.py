@@ -37,9 +37,11 @@ lunr_connect(urlmap, '/v1.0/{account_id:admin}/volumes', VolumeController,
              {'GET': 'index'})
 lunr_connect(urlmap, '/v1.0/{account_id}/volumes', VolumeController,
              {'GET': 'index'})
+
 lunr_connect(urlmap,
              '/v1.0/{account_id:admin}/volumes/{id}', VolumeController,
-             {'GET': 'show', 'POST': 'update', 'DELETE': 'delete'})
+             {'GET': 'show', 'POST': 'update', 'DELETE': 'delete', 'PUT': 'update_node_id'})
+
 lunr_connect(urlmap, '/v1.0/{account_id}/volumes/{id}', VolumeController,
              {'PUT': 'create', 'POST': 'update', 'GET': 'show',
               'DELETE': 'delete'})

@@ -816,3 +816,18 @@ class VolumeHelper(object):
         for opt, v in zip(options, values):
             status[opt] = v
         return status
+
+    def rename(self, old_name, new_name, callback=None, lock=None):
+        spawn(lock, self.lv_rename, old_name,new_name,
+              callback=callback, skip_fork=self.skip_fork)
+
+    def lv_rename(self, src, dest):
+        for i in range(0, 10):
+            try:
+                return execute('lvrename', self.volume_group, src, dest)
+            except ProcessError:
+                sleep(1)
+                continue
+        logger.error("Failed to rename volume '%s' to '%s' after 10 tries" %
+                     src, dest)
+        raise

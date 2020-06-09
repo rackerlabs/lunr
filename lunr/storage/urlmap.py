@@ -37,6 +37,10 @@ lunr_connect(urlmap, '/volumes/{id}', VolumeController,
 lunr_connect(urlmap, '/volumes/{id}/audit', VolumeController,
              {'PUT': 'audit'})
 
+# Volume rename
+lunr_connect(urlmap, '/volumes/{id}/rename', VolumeController,
+             {'PUT': 'rename'})
+
 # Volume lock
 lunr_connect(urlmap, '/volumes/{id}/lock', VolumeController,
              {'GET': 'lock'})

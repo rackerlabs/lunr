@@ -314,6 +314,22 @@ class VolumeController(BaseController):
         self.helper.backups.run_audit(volume, lock=lock, callback=callback)
         return Response(volume)
 
+    @lock("volumes/%(id)s/resource")
+    def rename(self, req, lock):
+        try:
+            logger.info("Renaming logical volume inprogress .")
+            volume = self.helper.volumes.get(self.id)
+        except NotFound:
+            raise HTTPNotFound("Cannot rename non-existant volume '%s'" %
+                               self.id)
+
+        callback = None
+        new_name = req.params.get('new_name')
+        self.helper.volumes.rename(self.id, new_name,
+                                  lock=lock, callback=callback)
+        logger.info("Renaming logical volume done.")
+        return Response(volume)
+
     def lock(self, req):
         info = inspect(self, req, "volumes/%(id)s/resource")
         with ResourceFile(info['lock_file']) as lock:
