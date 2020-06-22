@@ -336,3 +336,23 @@ class VolumeController(BaseController):
                                self.id)
         volume = self.db.query(Volume).filter_by(id=self.id).one()
         return Response(dict(volume))
+
+    def update_node_id(self, request):
+        """
+        PUT /v1.0/{account_id}/volumes/{id}
+
+        Update node id for volume that only admin can do
+        """
+        self._validate_transfer(request.params)
+        if 'node_id' not in request.params:
+            raise HTTPBadRequest("Mandatory parameter node_id is missing.")
+        node_id = request.params['node_id']
+
+        num_updated = self.account_query(Volume).\
+            filter_by(id=self.id).update({'node_id': node_id})
+        self.db.commit()
+        if not num_updated:
+            raise HTTPNotFound("Cannot update non-existent volume '%s'" %
+                               self.id)
+        volume = self.db.query(Volume).filter_by(id=self.id).one()
+        return Response(dict(volume))
