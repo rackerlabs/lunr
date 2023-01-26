@@ -114,7 +114,7 @@ def http_connection(url):
     if parsed.scheme == 'http':
         conn = HTTPConnection(parsed.netloc)
     elif parsed.scheme == 'https':
-        conn = HTTPSConnection(parsed.netloc)
+        conn = HTTPSConnection(parsed.netloc, timeout=10, context=ssl._create_unverified_context())
     else:
         raise ClientException('Cannot handle protocol scheme %s for url %s' %
                               (parsed.scheme, repr(url)))
