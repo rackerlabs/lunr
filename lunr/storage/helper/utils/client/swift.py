@@ -25,6 +25,7 @@ from urlparse import urlparse, urlunparse
 import errno
 import logging
 import socket
+import ssl
 
 from lunr.common import config, exc
 
