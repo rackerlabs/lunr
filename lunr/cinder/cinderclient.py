@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-import urllib2
+import urllib2, ssl
 import json
 
 from lunr.common.exc import HTTPClientError
@@ -35,7 +35,7 @@ def request(method, path, headers=None, data=None):
     req = urllib2.Request(path, headers=headers, data=data)
     req.get_method = lambda *args: method
     try:
-        resp = urllib2.urlopen(req)
+        resp = urllib2.urlopen(req, context=ssl._create_unverified_context())
         data = resp.read()
     except HTTPClientError.exceptions, e:
         raise CinderError(req, e)

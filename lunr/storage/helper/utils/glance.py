@@ -16,7 +16,7 @@
 
 import json
 from random import shuffle
-import urllib2
+import urllib2, ssl
 
 import glanceclient
 import glanceclient.exc as glance_exc
@@ -36,7 +36,7 @@ def request(method, path, headers=None, data=None):
     """
     req = urllib2.Request(path, headers=headers, data=data)
     req.get_method = lambda *args: method
-    resp = urllib2.urlopen(req)
+    resp = urllib2.urlopen(req, context=ssl._create_unverified_context())
     data = resp.read()
     logger.debug(
         "%s on %s succeeded with %s" %
