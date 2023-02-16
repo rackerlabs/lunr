@@ -16,7 +16,7 @@
 
 import hashlib
 import logging
-import lz4
+import lz4.block
 import multiprocessing
 import os
 import Queue
@@ -103,7 +103,7 @@ class Block(object):
     def _compress_body(self):
         decompressed = self.decompressed_body
         with self.timeit('compress'):
-            data = lz4.compress(decompressed)
+            data = lz4.block.compress(decompressed)
         self._compressed_body = StringIO(data)
 
     def _hydrate(self):
@@ -354,7 +354,7 @@ class RestoreProcess(multiprocessing.Process):
 
         with block.open('w+b') as f:
             with block.timeit('decompress'):
-                decompressed = lz4.decompress(body)
+                decompressed = lz4.block.decompress(body)
             with block.timeit('write'):
                 f.write(decompressed)
         block.restored()
